@@ -36,14 +36,14 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://dagscan.xyz"),
+  metadataBase: new URL("https://www.dagscan.xyz"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://dagscan.xyz",
+    url: "https://www.dagscan.xyz",
     title: "DagScan - Kaspa EVM Explorer",
     description:
       "Explore the Kaspa EVM ecosystem with DagScan - Your gateway to BlockDAG transactions, blocks, and addresses",
@@ -138,7 +138,7 @@ export default function RootLayout({
               name: "DagScan",
               description:
                 "Explore the Kaspa EVM ecosystem with DagScan - Your gateway to BlockDAG transactions, blocks, and addresses",
-              url: "https://dagscan.xyz",
+              url: "https://www.dagscan.xyz",
               applicationCategory: "FinanceApplication",
               operatingSystem: "Any",
               offers: {
