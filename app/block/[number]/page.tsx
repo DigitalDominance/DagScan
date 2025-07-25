@@ -184,7 +184,9 @@ export default function BlockPage() {
 
                     <div>
                       <label className="text-sm text-white/70 font-inter">Size</label>
-                      <div className="text-white font-inter mt-1">{blockData.size} bytes</div>
+                      <div className="text-white font-inter mt-1">
+                        {Number.parseInt(blockData.size || "0", 16).toLocaleString()} bytes
+                      </div>
                     </div>
                   </div>
                 </div>
