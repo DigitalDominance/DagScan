@@ -17,6 +17,7 @@ import {
   ChevronRight,
   Play,
   Pause,
+  Volume2,
 } from "lucide-react"
 import { KasplexAPI } from "@/lib/api"
 import BeamsBackground from "@/components/beams-background"
@@ -34,6 +35,12 @@ export default function AddressPage() {
   const [nfts, setNfts] = useState<any[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [playingVideo, setPlayingVideo] = useState<string | null>(null)
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null)
+  const [fullscreenMedia, setFullscreenMedia] = useState<{
+    id: string
+    type: "video" | "audio" | "image"
+    url: string
+  } | null>(null)
 
   const transactionsPerPage = 10
   const address = params.address as string
@@ -111,6 +118,18 @@ export default function AddressPage() {
     setPlayingVideo(playingVideo === nftId ? null : nftId)
   }
 
+  const handleAudioPlay = (nftId: string) => {
+    setPlayingAudio(playingAudio === nftId ? null : nftId)
+  }
+
+  const handleFullscreen = (nftId: string, type: "video" | "audio" | "image", url: string) => {
+    setFullscreenMedia({ id: nftId, type, url })
+  }
+
+  const closeFullscreen = () => {
+    setFullscreenMedia(null)
+  }
+
   const isVideoFile = (nft: any) => {
     // First check if metadata has "Videos" category
     if (nft.metadata?.attributes) {
@@ -130,6 +149,25 @@ export default function AddressPage() {
     return videoExtensions.some((ext) => lowerUrl.includes(ext)) || lowerUrl.includes("video")
   }
 
+  const isAudioFile = (nft: any) => {
+    // First check if metadata has "Audio" category
+    if (nft.metadata?.attributes) {
+      const categoryAttribute = nft.metadata.attributes.find(
+        (attr: any) => attr.trait_type === "Category" && attr.value === "Audio",
+      )
+      if (categoryAttribute) {
+        return true
+      }
+    }
+
+    // Fallback to URL-based detection
+    const mediaUrl = getMediaUrl(nft)
+    if (!mediaUrl) return false
+    const audioExtensions = [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]
+    const lowerUrl = mediaUrl.toLowerCase()
+    return audioExtensions.some((ext) => lowerUrl.includes(ext)) || lowerUrl.includes("audio")
+  }
+
   const getMediaUrl = (nft: any) => {
     // Check media_url first, then image_url, then metadata
     let url = nft.media_url || nft.image_url || nft.metadata?.image_url || nft.metadata?.image
@@ -140,6 +178,13 @@ export default function AddressPage() {
     }
 
     return url
+  }
+
+  const getDisplayImage = (nft: any) => {
+    if (isAudioFile(nft)) {
+      return "/soundicondag.webp"
+    }
+    return getMediaUrl(nft)
   }
 
   // Pagination logic
@@ -336,12 +381,14 @@ export default function AddressPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
                     {nfts.slice(0, 15).map((nft: any, index: number) => {
                       const mediaUrl = getMediaUrl(nft)
+                      const displayImage = getDisplayImage(nft)
                       const isVideo = isVideoFile(nft)
+                      const isAudio = isAudioFile(nft)
 
                       return (
                         <div
                           key={index}
-                          className="bg-white/5 rounded-lg p-2 sm:p-3 hover:bg-white/10 transition-colors"
+                          className="bg-white/5 rounded-lg p-2 sm:p-3 hover:bg-white/10 transition-colors group"
                         >
                           <div className="aspect-square mb-2 sm:mb-3 bg-white/5 rounded-lg overflow-hidden relative">
                             {isVideo ? (
@@ -362,26 +409,123 @@ export default function AddressPage() {
                                     }
                                   }}
                                 />
-                                <button
-                                  onClick={() => handleVideoPlay(nft.id)}
-                                  className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/50 transition-colors"
-                                >
-                                  {playingVideo === nft.id ? (
-                                    <Pause className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-                                  ) : (
-                                    <Play className="h-4 w-4 sm:h-6 sm:w-6 text-white" />
-                                  )}
-                                </button>
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleVideoPlay(nft.id)}
+                                      className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                                    >
+                                      {playingVideo === nft.id ? (
+                                        <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                                      ) : (
+                                        <Play className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleFullscreen(nft.id, "video", mediaUrl)}
+                                      className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                                    >
+                                      <svg
+                                        className="h-4 w-4 sm:h-5 sm:w-5 text-white"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                        />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
-                            ) : mediaUrl ? (
-                              <img
-                                src={mediaUrl || "/placeholder.svg"}
-                                alt={nft.metadata?.name || `NFT #${nft.id}`}
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = "/placeholder.svg?height=200&width=200&text=NFT"
-                                }}
-                              />
+                            ) : isAudio ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={displayImage || "/placeholder.svg"}
+                                  alt={nft.metadata?.name || `Audio NFT #${nft.id}`}
+                                  className="w-full h-full object-cover"
+                                />
+                                <audio
+                                  src={mediaUrl}
+                                  loop
+                                  ref={(audio) => {
+                                    if (audio) {
+                                      if (playingAudio === nft.id) {
+                                        audio.play()
+                                      } else {
+                                        audio.pause()
+                                      }
+                                    }
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => handleAudioPlay(nft.id)}
+                                      className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                                    >
+                                      {playingAudio === nft.id ? (
+                                        <Pause className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                                      ) : (
+                                        <Volume2 className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
+                                      )}
+                                    </button>
+                                    <button
+                                      onClick={() => handleFullscreen(nft.id, "audio", mediaUrl)}
+                                      className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                                    >
+                                      <svg
+                                        className="h-4 w-4 sm:h-5 sm:w-5 text-white"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                          strokeWidth={2}
+                                          d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                        />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : displayImage ? (
+                              <div className="relative w-full h-full">
+                                <img
+                                  src={displayImage || "/placeholder.svg"}
+                                  alt={nft.metadata?.name || `NFT #${nft.id}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = "/placeholder.svg?height=200&width=200&text=NFT"
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                  <button
+                                    onClick={() => handleFullscreen(nft.id, "image", displayImage)}
+                                    className="p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+                                  >
+                                    <svg
+                                      className="h-4 w-4 sm:h-5 sm:w-5 text-white"
+                                      fill="none"
+                                      stroke="currentColor"
+                                      viewBox="0 0 24 24"
+                                    >
+                                      <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={2}
+                                        d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"
+                                      />
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <div className="w-full h-full flex items-center justify-center text-white/50">
                                 <span className="text-xs">No Media</span>
@@ -395,7 +539,7 @@ export default function AddressPage() {
                                 {nft.metadata?.name || nft.token?.name || `#${nft.id}`}
                               </h3>
                               <Badge variant="secondary" className="text-xs flex-shrink-0">
-                                {nft.token_type || "NFT"}
+                                {isAudio ? "Audio" : isVideo ? "Video" : nft.token_type || "NFT"}
                               </Badge>
                             </div>
 
@@ -598,6 +742,41 @@ export default function AddressPage() {
         </main>
 
         <Footer />
+
+        {/* Fullscreen Media Modal */}
+        {fullscreenMedia && (
+          <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4">
+            <div className="relative w-full h-full max-w-6xl max-h-full">
+              <button
+                onClick={closeFullscreen}
+                className="absolute top-4 right-4 z-10 p-2 bg-black/50 rounded-full hover:bg-black/70 transition-colors"
+              >
+                <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+
+              {fullscreenMedia.type === "video" && (
+                <video src={fullscreenMedia.url} className="w-full h-full object-contain" controls autoPlay loop />
+              )}
+
+              {fullscreenMedia.type === "audio" && (
+                <div className="w-full h-full flex flex-col items-center justify-center">
+                  <img src="/soundicondag.webp" alt="Audio Player" className="max-w-md max-h-md mb-8" />
+                  <audio src={fullscreenMedia.url} className="w-full max-w-2xl" controls autoPlay />
+                </div>
+              )}
+
+              {fullscreenMedia.type === "image" && (
+                <img
+                  src={fullscreenMedia.url || "/placeholder.svg"}
+                  alt="Fullscreen NFT"
+                  className="w-full h-full object-contain"
+                />
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </BeamsBackground>
   )
