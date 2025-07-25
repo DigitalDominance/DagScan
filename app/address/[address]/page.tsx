@@ -111,16 +111,35 @@ export default function AddressPage() {
     setPlayingVideo(playingVideo === nftId ? null : nftId)
   }
 
-  const isVideoFile = (url: string) => {
-    if (!url) return false
+  const isVideoFile = (nft: any) => {
+    // First check if metadata has "Videos" category
+    if (nft.metadata?.attributes) {
+      const categoryAttribute = nft.metadata.attributes.find(
+        (attr: any) => attr.trait_type === "Category" && attr.value === "Videos",
+      )
+      if (categoryAttribute) {
+        return true
+      }
+    }
+
+    // Fallback to URL-based detection
+    const mediaUrl = getMediaUrl(nft)
+    if (!mediaUrl) return false
     const videoExtensions = [".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v"]
-    const lowerUrl = url.toLowerCase()
+    const lowerUrl = mediaUrl.toLowerCase()
     return videoExtensions.some((ext) => lowerUrl.includes(ext)) || lowerUrl.includes("video")
   }
 
   const getMediaUrl = (nft: any) => {
-    // Check animation_url first (usually videos), then image_url, then metadata
-    return nft.animation_url || nft.image_url || nft.metadata?.image_url || nft.metadata?.animation_url
+    // Check media_url first, then image_url, then metadata
+    let url = nft.media_url || nft.image_url || nft.metadata?.image_url || nft.metadata?.image
+
+    // Convert IPFS URLs to HTTP gateway URLs
+    if (url && url.startsWith("ipfs://")) {
+      url = url.replace("ipfs://", "https://ipfs.io/ipfs/")
+    }
+
+    return url
   }
 
   // Pagination logic
@@ -317,7 +336,7 @@ export default function AddressPage() {
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-2 sm:gap-4">
                     {nfts.slice(0, 15).map((nft: any, index: number) => {
                       const mediaUrl = getMediaUrl(nft)
-                      const isVideo = isVideoFile(mediaUrl)
+                      const isVideo = isVideoFile(nft)
 
                       return (
                         <div
