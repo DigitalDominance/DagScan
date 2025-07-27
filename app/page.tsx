@@ -23,8 +23,9 @@ export default function Home() {
   }
 
   return (
-    <BeamsBackground>
-      <div className="min-h-screen flex flex-col font-inter">
+    <>
+      <BeamsBackground />
+      <div className="relative z-10 min-h-screen flex flex-col font-inter">
         <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
 
         <main className="flex-1">
@@ -33,6 +34,6 @@ export default function Home() {
 
         <Footer />
       </div>
-    </BeamsBackground>
+    </>
   )
 }

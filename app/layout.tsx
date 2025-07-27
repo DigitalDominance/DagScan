@@ -1,9 +1,9 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Inter, Orbitron, Rajdhani } from "next/font/google"
+import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
-import "./globals.css"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,14 +36,14 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
-  metadataBase: new URL("https://www.dagscan.xyz"),
+  metadataBase: new URL("https://dagscan.xyz/"),
   alternates: {
     canonical: "/",
   },
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://www.dagscan.xyz",
+    url: "https://dagscan.xyz",
     title: "DagScan - Kaspa EVM Explorer",
     description:
       "Explore the Kaspa EVM ecosystem with DagScan - Your gateway to BlockDAG transactions, blocks, and addresses",
@@ -86,6 +86,7 @@ export const metadata: Metadata = {
     google: "your-google-verification-code", // Replace with actual verification code
   },
   category: "technology",
+    generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -138,7 +139,7 @@ export default function RootLayout({
               name: "DagScan",
               description:
                 "Explore the Kaspa EVM ecosystem with DagScan - Your gateway to BlockDAG transactions, blocks, and addresses",
-              url: "https://www.dagscan.xyz",
+              url: "https://dagscan.xyz",
               applicationCategory: "FinanceApplication",
               operatingSystem: "Any",
               offers: {
@@ -156,8 +157,10 @@ export default function RootLayout({
         />
       </head>
       <body className="font-inter antialiased">
-        <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
-        <Analytics />
+        <Suspense fallback={<div>Loading...</div>}>
+          {children}
+          <Analytics />
+        </Suspense>
       </body>
     </html>
   )

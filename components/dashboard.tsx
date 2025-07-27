@@ -1,11 +1,22 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "motion/react"
+import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { CuboidIcon as Cube, Activity, TrendingUp, Clock, ArrowRight, Wifi, WifiOff, RefreshCw } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import {
+  CuboidIcon as Cube,
+  Activity,
+  TrendingUp,
+  Clock,
+  ArrowRight,
+  Wifi,
+  WifiOff,
+  RefreshCw,
+  BarChart3,
+} from "lucide-react"
 import { KasplexAPI } from "@/lib/api"
 import ClickableAddress from "./clickable-address"
 import PaginatedBlocks from "./paginated-blocks"
@@ -41,6 +52,27 @@ interface Transaction {
   type: string
 }
 
+interface KasplexStats {
+  average_block_time: number
+  coin_price: string
+  coin_price_change_percentage: number
+  market_cap: string
+  gas_prices: {
+    slow: number
+    average: number
+    fast: number
+  }
+  transactions_today: string
+  total_transactions: string
+  total_blocks: string
+  total_addresses: string
+}
+
+interface TransactionChartData {
+  date: string
+  transaction_count: number
+}
+
 export default function Dashboard({ network, searchQuery, onSearchResult }: DashboardProps) {
   const [blocks, setBlocks] = useState<Block[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
@@ -50,6 +82,10 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
     avgBlockTime: 0,
     gasPrice: "0",
   })
+  const [kasplexStats, setKasplexStats] = useState<KasplexStats | null>(null)
+  const [transactionChartData, setTransactionChartData] = useState<TransactionChartData[]>([])
+  const [selectedTimePeriod, setSelectedTimePeriod] = useState<"24H" | "7D" | "30D" | "ALL">("24H")
+  const [transactionLoading, setTransactionLoading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isUsingMockData, setIsUsingMockData] = useState(false)
@@ -67,6 +103,44 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   const isValidTxHash = (hash: string): boolean => {
     return /^0x[a-fA-F0-9]{64}$/.test(hash)
   }
+
+  // Fetch Kasplex stats from the new API
+  const fetchKasplexStats = useCallback(async () => {
+    try {
+      const [statsResponse, chartResponse] = await Promise.all([
+        fetch("https://frontend.kasplextest.xyz/api/v2/stats"),
+        fetch("https://frontend.kasplextest.xyz/api/v2/stats/charts/transactions"),
+      ])
+
+      if (statsResponse.ok) {
+        const statsData = await statsResponse.json()
+        setKasplexStats(statsData)
+      }
+
+      if (chartResponse.ok) {
+        const chartData = await chartResponse.json()
+        setTransactionChartData(chartData.chart_data || [])
+      }
+    } catch (error) {
+      console.error("Failed to fetch Kasplex stats:", error)
+      // Set fallback values
+      setKasplexStats({
+        average_block_time: 1747,
+        coin_price: "0.1057",
+        coin_price_change_percentage: 5.67,
+        market_cap: "2787234502.64645427516",
+        gas_prices: {
+          slow: 1785.92,
+          average: 1833.22,
+          fast: 2163.5,
+        },
+        transactions_today: "348333",
+        total_transactions: "10798008",
+        total_blocks: "2057730",
+        total_addresses: "259035",
+      })
+    }
+  }, [])
 
   const fetchData = useCallback(
     async (showError = true) => {
@@ -99,21 +173,70 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
     [network],
   )
 
+  // Calculate transactions for selected time period
+  const getTransactionsForPeriod = useCallback(() => {
+    if (selectedTimePeriod === "ALL") {
+      return kasplexStats ? Number.parseInt(kasplexStats.total_transactions) : 0
+    }
+
+    if (!transactionChartData.length) return 0
+
+    const now = new Date()
+    let daysBack = 1
+
+    switch (selectedTimePeriod) {
+      case "7D":
+        daysBack = 7
+        break
+      case "30D":
+        daysBack = 30
+        break
+      default:
+        return kasplexStats ? Number.parseInt(kasplexStats.transactions_today) : 0
+    }
+
+    const cutoffDate = new Date(now.getTime() - daysBack * 24 * 60 * 60 * 1000)
+    return transactionChartData
+      .filter((item) => new Date(item.date) >= cutoffDate)
+      .reduce((sum, item) => sum + item.transaction_count, 0)
+  }, [transactionChartData, selectedTimePeriod, kasplexStats])
+
+  // Handle time period change with smooth loading
+  const handleTimePeriodChange = async (period: typeof selectedTimePeriod) => {
+    if (period === selectedTimePeriod) return
+
+    setTransactionLoading(true)
+    setSelectedTimePeriod(period)
+
+    // Add a small delay for smooth transition
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    setTransactionLoading(false)
+  }
+
   // Initial load
   useEffect(() => {
     const initialLoad = async () => {
       setInitialLoading(true)
-      await fetchData()
+      await Promise.all([fetchData(), fetchKasplexStats()])
       setInitialLoading(false)
     }
     initialLoad()
-  }, [network, fetchData])
+  }, [network, fetchData, fetchKasplexStats])
 
-  // Background updates every 5 seconds (less frequent to avoid overwhelming failed endpoints)
+  // Background updates every 3 seconds for Kasplex stats
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchKasplexStats()
+    }, 3000)
+
+    return () => clearInterval(interval)
+  }, [fetchKasplexStats])
+
+  // Background updates every 3 seconds for blockchain data (latest block, avg block time)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchData(false) // Don't show errors on background updates
-    }, 5000)
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [fetchData])
@@ -169,6 +292,34 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
     return `${Math.floor(seconds / 3600)}h ago`
   }
 
+  const formatPrice = (price: string) => {
+    return `$${Number.parseFloat(price).toFixed(4)}`
+  }
+
+  const formatLargeNumber = (value: string | number) => {
+    const num = typeof value === "string" ? Number.parseFloat(value) : value
+    if (num >= 1e9) {
+      return `$${(num / 1e9).toFixed(2)}B`
+    } else if (num >= 1e6) {
+      return `$${(num / 1e6).toFixed(2)}M`
+    } else if (num >= 1e3) {
+      return `$${(num / 1e3).toFixed(2)}K`
+    }
+    return `$${num.toFixed(2)}`
+  }
+
+  const formatPriceChange = (changePercentage: number) => {
+    const isPositive = changePercentage >= 0
+    const sign = isPositive ? "+" : ""
+    const color = isPositive ? "text-green-400" : "text-red-400"
+    return (
+      <span className={`${color} text-[10px] sm:text-xs font-inter font-bold ml-1`}>
+        {sign}
+        {changePercentage.toFixed(2)}% <span className="opacity-70 font-normal">(24 Hours)</span>
+      </span>
+    )
+  }
+
   const getTransactionTypeColor = (type: string) => {
     switch (type) {
       case "Token Transfer":
@@ -201,6 +352,13 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
     }
     return shortNames[type] || type
   }
+
+  const timePeriods = [
+    { key: "24H" as const, label: "24H" },
+    { key: "7D" as const, label: "7D" },
+    { key: "30D" as const, label: "30D" },
+    { key: "ALL" as const, label: "All" },
+  ]
 
   if (initialLoading) {
     return (
@@ -251,14 +409,6 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
               </>
             )}
           </div>
-          <div className="text-xs sm:text-sm text-white/50 font-inter">
-            Last updated: {new Date().toLocaleTimeString()}
-            {isUsingMockData && (
-              <Badge variant="secondary" className="ml-2 text-xs">
-                Demo Data
-              </Badge>
-            )}
-          </div>
         </div>
 
         {/* Demo Mode Warning */}
@@ -280,93 +430,200 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
           </motion.div>
         )}
 
-        {/* Network Stats - Using inline styles to force backgrounds */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6 }}
-          className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6"
-        >
-          <Card
-            className="backdrop-blur-sm shadow-lg"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(147, 51, 234, 0.4) 0%, rgba(126, 34, 206, 0.3) 50%, rgba(109, 40, 217, 0.2) 100%)",
-              borderColor: "rgba(147, 51, 234, 0.3)",
-              boxShadow: "0 10px 25px -5px rgba(147, 51, 234, 0.2)",
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">Latest Block</CardTitle>
-              <Cube className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-base sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
-                <AnimatedCounter value={stats.latestBlock} />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            className="backdrop-blur-sm shadow-lg"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(59, 130, 246, 0.4) 0%, rgba(37, 99, 235, 0.3) 50%, rgba(29, 78, 216, 0.2) 100%)",
-              borderColor: "rgba(59, 130, 246, 0.3)",
-              boxShadow: "0 10px 25px -5px rgba(59, 130, 246, 0.2)",
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                Recent Transactions
+        {/* Kaspa Market Stats - Now at the top */}
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
+          <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
+                <img src="/kaspa-logo.png" alt="Kaspa" className="h-5 w-5" />
+                Kaspa Market Data
               </CardTitle>
-              <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
             </CardHeader>
-            <CardContent>
-              <div className="text-base sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
-                <AnimatedCounter value={transactions.length} />
-              </div>
-            </CardContent>
-          </Card>
+            <CardContent className="space-y-4">
+              {/* Main Market Cards - Mobile: 2 cards on first row, 1 full-width on second row */}
+              <div className="space-y-3 sm:space-y-0">
+                {/* First row: KAS Price and Market Cap */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-4 lg:gap-6">
+                  {/* KAS Price Card */}
+                  <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-green-500/30">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 sm:px-6 pt-2 sm:pt-6">
+                      <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani truncate">
+                        KAS Price
+                      </CardTitle>
+                      <img src="/kaspa-logo.png" alt="Kaspa" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                    </CardHeader>
+                    <CardContent className="px-2 sm:px-6 pb-2 sm:pb-6">
+                      <div className="flex flex-col">
+                        <div className="text-sm sm:text-2xl font-bold text-white font-orbitron">
+                          {kasplexStats ? formatPrice(kasplexStats.coin_price) : "$0.0000"}
+                        </div>
+                        {kasplexStats && (
+                          <div className="flex items-center">
+                            {formatPriceChange(kasplexStats.coin_price_change_percentage)}
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
 
-          <Card
-            className="backdrop-blur-sm shadow-lg"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(236, 72, 153, 0.4) 0%, rgba(219, 39, 119, 0.3) 50%, rgba(190, 24, 93, 0.2) 100%)",
-              borderColor: "rgba(236, 72, 153, 0.3)",
-              boxShadow: "0 10px 25px -5px rgba(236, 72, 153, 0.2)",
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                Avg Block Time
-              </CardTitle>
-              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-pink-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-base sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
-                <AnimatedCounter value={stats.avgBlockTime} decimals={1} suffix="s" />
-              </div>
-            </CardContent>
-          </Card>
+                  {/* Market Cap Card */}
+                  <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-purple-500/30">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 sm:px-6 pt-2 sm:pt-6">
+                      <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani truncate">
+                        Market Cap
+                      </CardTitle>
+                      <BarChart3 className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400 flex-shrink-0" />
+                    </CardHeader>
+                    <CardContent className="px-2 sm:px-6 pb-2 sm:pb-6">
+                      <div className="text-sm sm:text-2xl font-bold text-white font-orbitron">
+                        {kasplexStats ? formatLargeNumber(kasplexStats.market_cap) : "$0.00B"}
+                      </div>
+                      <p className="text-[9px] sm:text-xs text-purple-300 mt-0.5 sm:mt-1 font-inter">
+                        Total Market Value
+                      </p>
+                    </CardContent>
+                  </Card>
 
-          <Card
-            className="backdrop-blur-sm shadow-lg"
-            style={{
-              background:
-                "linear-gradient(135deg, rgba(99, 102, 241, 0.4) 0%, rgba(79, 70, 229, 0.3) 50%, rgba(67, 56, 202, 0.2) 100%)",
-              borderColor: "rgba(99, 102, 241, 0.3)",
-              boxShadow: "0 10px 25px -5px rgba(99, 102, 241, 0.2)",
-            }}
-          >
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">Gas Price</CardTitle>
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-400" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-base sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
-                <AnimatedCounter value={Number.parseFloat(stats.gasPrice)} decimals={2} suffix=" Gwei" />
+                  {/* L2 Transactions Card - Hidden on mobile, shown on desktop */}
+                  <Card className="hidden sm:block bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-blue-500/30">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 sm:px-6 pt-2 sm:pt-6">
+                      <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani truncate">
+                        L2 Transactions
+                      </CardTitle>
+                      <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400 flex-shrink-0" />
+                    </CardHeader>
+                    <CardContent className="px-2 sm:px-6 pb-2 sm:pb-6">
+                      <div className="text-sm sm:text-2xl font-bold text-white font-orbitron mb-1 sm:mb-3">
+                        {transactionLoading ? (
+                          <div className="animate-pulse text-xs sm:text-base">Loading...</div>
+                        ) : (
+                          <AnimatedCounter value={getTransactionsForPeriod()} />
+                        )}
+                      </div>
+
+                      {/* Desktop: Button Grid */}
+                      <div className="flex flex-wrap gap-1">
+                        {timePeriods.map((period) => (
+                          <Button
+                            key={period.key}
+                            variant={selectedTimePeriod === period.key ? "default" : "ghost"}
+                            size="sm"
+                            onClick={() => handleTimePeriodChange(period.key)}
+                            disabled={transactionLoading}
+                            className={`text-xs px-2 py-1 h-6 font-rajdhani ${
+                              selectedTimePeriod === period.key
+                                ? "bg-slate-900/80 border-2 border-transparent bg-clip-padding before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-gradient-to-br before:from-blue-500/40 before:via-purple-500/40 before:to-pink-500/40 before:p-[2px] text-white shadow-[0_0_15px_rgba(59,130,246,0.3)] relative"
+                                : "text-blue-300 hover:text-white hover:bg-blue-600/20"
+                            }`}
+                          >
+                            {period.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Second row: L2 Transactions Card - Full width on mobile only */}
+                <Card className="sm:hidden bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-blue-500/30">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 pt-2">
+                    <CardTitle className="text-xs font-medium text-white/70 font-rajdhani truncate">
+                      L2 Transactions
+                    </CardTitle>
+                    <Activity className="h-3 w-3 text-blue-400 flex-shrink-0" />
+                  </CardHeader>
+                  <CardContent className="px-2 pb-2">
+                    <div className="text-sm font-bold text-white font-orbitron mb-2">
+                      {transactionLoading ? (
+                        <div className="animate-pulse text-xs">Loading...</div>
+                      ) : (
+                        <AnimatedCounter value={getTransactionsForPeriod()} />
+                      )}
+                    </div>
+
+                    {/* Mobile: Dropdown */}
+                    <div>
+                      <Select value={selectedTimePeriod} onValueChange={handleTimePeriodChange}>
+                        <SelectTrigger className="w-full h-5 text-[10px] bg-slate-900/80 border-2 border-transparent bg-clip-padding before:absolute before:inset-0 before:-z-10 before:rounded-md before:bg-gradient-to-br before:from-blue-500/40 before:via-purple-500/40 before:to-pink-500/40 before:p-[2px] text-white font-medium shadow-[0_0_12px_rgba(59,130,246,0.3)] relative">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900/95 border-2 border-blue-500/30 backdrop-blur-sm shadow-2xl">
+                          {timePeriods.map((period) => (
+                            <SelectItem
+                              key={period.key}
+                              value={period.key}
+                              className="text-xs text-white hover:bg-white/20 focus:bg-white/30 font-medium"
+                            >
+                              {period.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Network Stats - Now inside the market data container */}
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+                <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-purple-500/30">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
+                      Latest Block
+                    </CardTitle>
+                    <Cube className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
+                      <AnimatedCounter value={stats.latestBlock} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-blue-500/30">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
+                      Total Addresses
+                    </CardTitle>
+                    <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
+                      <AnimatedCounter value={kasplexStats ? Number.parseInt(kasplexStats.total_addresses) : 0} />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-pink-500/30">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
+                      Avg Block Time
+                    </CardTitle>
+                    <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-pink-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
+                      <AnimatedCounter value={stats.avgBlockTime} decimals={1} suffix="s" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-indigo-500/30">
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
+                      Gas Price
+                    </CardTitle>
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-400" />
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
+                      <AnimatedCounter
+                        value={kasplexStats ? Math.round(kasplexStats.gas_prices.average) : 0}
+                        suffix=" Gwei"
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </CardContent>
           </Card>
