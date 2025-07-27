@@ -151,7 +151,7 @@ export default function BeamsBackground({ className, children, intensity = "stro
   }, [intensity])
 
   return (
-    <div className={cn("fixed inset-0 w-full h-full overflow-hidden bg-neutral-950 z-0", className)}>
+    <div className={cn("relative min-h-screen w-full overflow-hidden bg-neutral-950", className)}>
       <canvas ref={canvasRef} className="absolute inset-0" style={{ filter: "blur(15px)" }} />
 
       <motion.div

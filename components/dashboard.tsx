@@ -16,6 +16,7 @@ import {
   WifiOff,
   RefreshCw,
   BarChart3,
+  Wallet,
 } from "lucide-react"
 import { KasplexAPI } from "@/lib/api"
 import ClickableAddress from "./clickable-address"
@@ -585,7 +586,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                     <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
                       Total Addresses
                     </CardTitle>
-                    <Activity className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
+                    <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
                   </CardHeader>
                   <CardContent>
                     <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
