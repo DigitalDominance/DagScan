@@ -77,10 +77,12 @@ export default function ZealousSwapPage() {
             <Button
               variant="ghost"
               onClick={() => router.push("/dapps")}
-              className="text-white/70 hover:text-white mb-4"
+              className="relative text-white hover:bg-black/60 active:bg-black/80 mb-4 overflow-hidden before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-br before:from-blue-500 before:via-purple-500 before:to-pink-500 after:absolute after:inset-[1px] after:bg-black/40 after:backdrop-blur-xl after:rounded-[calc(0.375rem-1px)] hover:after:bg-black/60 active:after:bg-black/80"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to DApps
+              <span className="relative z-10 flex items-center">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Back to DApps
+              </span>
             </Button>
 
             <motion.div
@@ -102,11 +104,13 @@ export default function ZealousSwapPage() {
 
               <div className="flex gap-3">
                 <Button
-                  className="bg-gradient-to-r from-green-500 to-blue-500 text-white font-rajdhani"
+                  className="relative text-white font-rajdhani hover:bg-black/60 active:bg-black/80 overflow-hidden before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-br before:from-green-500 before:to-blue-500 after:absolute after:inset-[1px] after:bg-black/40 after:backdrop-blur-xl after:rounded-[calc(0.375rem-1px)] hover:after:bg-black/60 active:after:bg-black/80"
                   onClick={() => window.open("https://www.zealousswap.com/", "_blank")}
                 >
-                  <ExternalLink className="h-4 w-4 mr-2" />
-                  Launch App
+                  <span className="relative z-10 flex items-center">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Launch App
+                  </span>
                 </Button>
               </div>
             </motion.div>
