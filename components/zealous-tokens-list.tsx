@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
+import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
@@ -371,7 +371,7 @@ export default function ZealousTokensList({ limit = 10, showPagination = true }:
                   </div>
                   <div>
                     <div className="text-white/50 text-xs font-rajdhani mb-1">Supply</div>
-                    <div className="text-white/70 font-orbitron text-sm">
+                    <div className="text-white/70 font-orbitron text-xs">
                       {tokenSupplies[token.address]?.toLocaleString() || "N/A"}
                     </div>
                   </div>
