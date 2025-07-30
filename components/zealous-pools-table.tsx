@@ -33,19 +33,19 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
   const zealousAPI = new ZealousAPI()
   const poolsPerPage = limit
 
-  const fetchTokenInfo = async (tokenAddress: string): Promise<TokenInfo | null> => {
+  const fetchAllTokens = async (): Promise<TokenInfo[]> => {
     try {
       const response = await fetch(
-        `https://dagscanbackend-7220ff41cc76.herokuapp.com/api/zealous/tokens/${tokenAddress}`,
+        `https://dagscanbackend-7220ff41cc76.herokuapp.com/api/zealous/tokens?limit=1000&skip=0`,
       )
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
-      const tokenData = await response.json()
-      return tokenData
+      const tokensData = await response.json()
+      return tokensData
     } catch (error) {
-      console.warn(`Failed to fetch token info for ${tokenAddress}:`, error)
-      return null
+      console.warn("Failed to fetch all tokens:", error)
+      return []
     }
   }
 
@@ -87,25 +87,14 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
         const offset = (currentPage - 1) * poolsPerPage
         const poolsData = await zealousAPI.getLatestPools(poolsPerPage, offset, sortBy, sortOrder)
 
-        // Fetch token logos for all unique token addresses
-        const uniqueTokenAddresses = new Set<string>()
-        poolsData.forEach((pool) => {
-          uniqueTokenAddresses.add(pool.token0.address.toLowerCase())
-          uniqueTokenAddresses.add(pool.token1.address.toLowerCase())
-        })
+        // Fetch all tokens to get logo information
+        const allTokens = await fetchAllTokens()
 
-        const logoPromises = Array.from(uniqueTokenAddresses).map(async (address) => {
-          const tokenInfo = await fetchTokenInfo(address)
-          return {
-            address,
-            logoURI: tokenInfo?.logoURI ? getTokenLogoUrl(tokenInfo.logoURI) : "/placeholder.svg?height=40&width=40",
-          }
-        })
-
-        const logoResults = await Promise.all(logoPromises)
+        // Create a map of token addresses to logo URLs
         const logoMap: Record<string, string> = {}
-        logoResults.forEach((result) => {
-          logoMap[result.address] = result.logoURI
+        allTokens.forEach((token) => {
+          const address = token.address.toLowerCase()
+          logoMap[address] = token.logoURI ? getTokenLogoUrl(token.logoURI) : "/placeholder.svg?height=40&width=40"
         })
 
         setTokenLogos(logoMap)
