@@ -56,6 +56,11 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const [dragStart, setDragStart] = useState<{ x: number; panOffset: number }>({ x: 0, panOffset: 0 })
   const [lastTouchDistance, setLastTouchDistance] = useState<number>(0)
   const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
+  const [initialPinchData, setInitialPinchData] = useState<{
+    zoom: number
+    pan: number
+    center: { x: number; y: number }
+  } | null>(null)
   const chartRef = useRef<HTMLDivElement>(null)
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
@@ -403,6 +408,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const handleMouseDown = (event: React.MouseEvent) => {
     if (!isFullscreen) return
 
+    event.preventDefault()
     setIsDragging(true)
     setDragStart({ x: event.clientX, panOffset })
     closeTooltip()
@@ -412,6 +418,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const handleMouseMove = (event: React.MouseEvent) => {
     if (!isFullscreen || !isDragging) return
 
+    event.preventDefault()
     const deltaX = event.clientX - dragStart.x
     const newPanOffset = dragStart.panOffset + deltaX
     setPanOffset(newPanOffset)
@@ -426,14 +433,25 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const handleTouchStart = (event: React.TouchEvent) => {
     if (!isFullscreen) return
 
+    event.preventDefault()
+
     if (event.touches.length === 2) {
+      // Two finger pinch
       const distance = getTouchDistance(event.touches)
       const center = getTouchCenter(event.touches)
       setLastTouchDistance(distance)
       setLastTouchCenter(center)
+      setInitialPinchData({
+        zoom: zoomLevel,
+        pan: panOffset,
+        center: center,
+      })
+      setIsDragging(false)
     } else if (event.touches.length === 1) {
+      // Single finger drag
       setIsDragging(true)
       setDragStart({ x: event.touches[0].clientX, panOffset })
+      setInitialPinchData(null)
       closeTooltip()
     }
   }
@@ -442,21 +460,32 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const handleTouchMove = (event: React.TouchEvent) => {
     if (!isFullscreen) return
 
-    if (event.touches.length === 2 && lastTouchDistance > 0) {
-      event.preventDefault()
-      const distance = getTouchDistance(event.touches)
-      const scale = distance / lastTouchDistance
+    event.preventDefault()
+    event.stopPropagation()
 
-      if (scale > 1.05) {
-        // Pinch out - zoom in
-        setZoomLevel((prev) => Math.min(prev * 1.1, 5))
-        setLastTouchDistance(distance)
-      } else if (scale < 0.95) {
-        // Pinch in - zoom out
-        setZoomLevel((prev) => Math.max(prev * 0.9, 0.5))
-        setLastTouchDistance(distance)
+    if (event.touches.length === 2 && lastTouchDistance > 0 && initialPinchData) {
+      // Two finger pinch zoom
+      const distance = getTouchDistance(event.touches)
+      const center = getTouchCenter(event.touches)
+
+      const scale = distance / lastTouchDistance
+      const newZoomLevel = Math.min(Math.max(initialPinchData.zoom * scale, 0.5), 5)
+
+      // Calculate pan offset to keep zoom centered
+      const rect = fullscreenRef.current?.getBoundingClientRect()
+      if (rect) {
+        const centerX = center.x - rect.left
+        const containerWidth = rect.width
+        const zoomPoint = centerX / containerWidth
+
+        const zoomRatio = newZoomLevel / zoomLevel
+        const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
+
+        setZoomLevel(newZoomLevel)
+        setPanOffset(newPanOffset)
       }
     } else if (event.touches.length === 1 && isDragging) {
+      // Single finger drag
       const deltaX = event.touches[0].clientX - dragStart.x
       const newPanOffset = dragStart.panOffset + deltaX
       setPanOffset(newPanOffset)
@@ -464,9 +493,23 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   }
 
   // Handle touch end
-  const handleTouchEnd = () => {
-    setLastTouchDistance(0)
-    setIsDragging(false)
+  const handleTouchEnd = (event: React.TouchEvent) => {
+    if (!isFullscreen) return
+
+    event.preventDefault()
+
+    if (event.touches.length === 0) {
+      // All fingers lifted
+      setLastTouchDistance(0)
+      setIsDragging(false)
+      setInitialPinchData(null)
+    } else if (event.touches.length === 1) {
+      // One finger remaining, switch to drag mode
+      setLastTouchDistance(0)
+      setInitialPinchData(null)
+      setIsDragging(true)
+      setDragStart({ x: event.touches[0].clientX, panOffset })
+    }
   }
 
   // Custom chart component with gradient and interaction handling
@@ -522,8 +565,14 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
         style={{
-          touchAction: isFullscreenMode ? "none" : "auto",
+          touchAction: "none",
           cursor: isFullscreenMode ? (isDragging ? "grabbing" : "grab") : "default",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          MozUserSelect: "none",
+          msUserSelect: "none",
+          WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
         }}
       >
         <div
@@ -540,6 +589,11 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             className="overflow-visible"
             preserveAspectRatio="none"
+            style={{
+              userSelect: "none",
+              WebkitUserSelect: "none",
+              pointerEvents: isFullscreenMode ? "auto" : "none",
+            }}
           >
             <defs>
               <linearGradient id="priceGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -598,46 +652,51 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                   onClick={(e) => handleChartClick(e, point)}
                   onMouseEnter={(e) => isFullscreenMode && handleChartHover(e, point)}
                   onMouseLeave={() => isFullscreenMode && closeTooltip()}
+                  style={{ pointerEvents: isFullscreenMode ? "auto" : "none" }}
                 />
               )
             })}
           </svg>
 
-          {/* Y-axis labels - fixed position in fullscreen */}
+          {/* Y-axis labels - improved mobile positioning */}
           <div
-            className={`absolute top-0 h-full flex flex-col justify-between text-xs text-white/50 font-rajdhani ${
-              isFullscreenMode ? "left-4 fixed" : "left-0 -ml-16"
+            className={`absolute top-0 h-full flex flex-col justify-between text-xs text-white/50 font-rajdhani pointer-events-none select-none ${
+              isFullscreenMode ? "left-2 sm:left-4 z-10" : "left-0 -ml-12 sm:-ml-16"
             }`}
             style={
               isFullscreenMode
                 ? {
                     position: "fixed",
-                    left: "1rem",
+                    left: window.innerWidth < 640 ? "0.5rem" : "1rem",
                     top: "50%",
                     transform: "translateY(-50%)",
                     height: `${chartHeight}px`,
+                    zIndex: 10,
+                    backgroundColor: isFullscreenMode ? "rgba(0,0,0,0.8)" : "transparent",
+                    borderRadius: "0.25rem",
+                    padding: "0.25rem",
                   }
                 : {}
             }
           >
-            <span>{formatCurrency(maxPrice + padding)}</span>
-            <span>{formatCurrency(maxPrice * 0.75 + minPrice * 0.25)}</span>
-            <span>{formatCurrency((maxPrice + minPrice) / 2)}</span>
-            <span>{formatCurrency(maxPrice * 0.25 + minPrice * 0.75)}</span>
-            <span>{formatCurrency(minPrice - padding)}</span>
+            <span className="text-xs sm:text-sm">{formatCurrency(maxPrice + padding)}</span>
+            <span className="text-xs sm:text-sm">{formatCurrency(maxPrice * 0.75 + minPrice * 0.25)}</span>
+            <span className="text-xs sm:text-sm">{formatCurrency((maxPrice + minPrice) / 2)}</span>
+            <span className="text-xs sm:text-sm">{formatCurrency(maxPrice * 0.25 + minPrice * 0.75)}</span>
+            <span className="text-xs sm:text-sm">{formatCurrency(minPrice - padding)}</span>
           </div>
 
           {/* X-axis labels */}
-          <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-white/50 font-rajdhani mt-2 px-2">
+          <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-white/50 font-rajdhani mt-2 px-2 pointer-events-none select-none">
             {validData.length > 0 && (
               <>
-                <span className="truncate">{formatTimeLabel(validData[0].timestamp, isShortRange)}</span>
+                <span className="truncate text-xs">{formatTimeLabel(validData[0].timestamp, isShortRange)}</span>
                 {validData.length > 2 && (
-                  <span className="truncate">
+                  <span className="truncate text-xs">
                     {formatTimeLabel(validData[Math.floor(validData.length / 2)].timestamp, isShortRange)}
                   </span>
                 )}
-                <span className="truncate">
+                <span className="truncate text-xs">
                   {formatTimeLabel(validData[validData.length - 1].timestamp, isShortRange)}
                 </span>
               </>
@@ -647,20 +706,27 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           {/* Tooltip */}
           {tooltip.visible && (
             <div
-              className="absolute z-50 bg-black/90 border border-white/20 rounded-lg p-3 text-white text-sm font-inter backdrop-blur-xl max-w-xs"
+              className="absolute z-50 bg-black/90 border border-white/20 rounded-lg p-3 text-white text-sm font-inter backdrop-blur-xl max-w-xs pointer-events-none select-none"
               style={{
                 left: tooltip.x + 10,
                 top: tooltip.y - 10,
                 transform: tooltip.x > chartWidth / 2 ? "translateX(-100%)" : "none",
               }}
             >
-              <button onClick={closeTooltip} className="absolute top-1 right-1 text-white/50 hover:text-white">
+              <button
+                onClick={closeTooltip}
+                className="absolute top-1 right-1 text-white/50 hover:text-white pointer-events-auto"
+              >
                 <X className="h-3 w-3" />
               </button>
               <div className="space-y-1">
-                <div className="font-orbitron text-purple-400">Price: {formatCurrency(tooltip.price)}</div>
-                <div className="font-orbitron text-blue-400">Market Cap: {formatCurrency(tooltip.marketCap)}</div>
-                <div className="font-rajdhani text-white/70">
+                <div className="font-orbitron text-purple-400 text-xs sm:text-sm">
+                  Price: {formatCurrency(tooltip.price)}
+                </div>
+                <div className="font-orbitron text-blue-400 text-xs sm:text-sm">
+                  Market Cap: {formatCurrency(tooltip.marketCap)}
+                </div>
+                <div className="font-rajdhani text-white/70 text-xs">
                   {isShortRange
                     ? new Date(tooltip.timestamp).toLocaleString()
                     : new Date(tooltip.timestamp).toLocaleDateString()}
@@ -705,10 +771,20 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   // Fullscreen overlay
   if (isFullscreen) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl">
+      <div
+        className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl"
+        style={{
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          MozUserSelect: "none",
+          msUserSelect: "none",
+          WebkitTouchCallout: "none",
+          WebkitTapHighlightColor: "transparent",
+        }}
+      >
         <div className="h-full flex flex-col">
           {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-white/20 gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-white/20 gap-4 flex-shrink-0">
             <div className="flex flex-col sm:flex-row sm:items-center gap-4">
               <h2 className="text-lg sm:text-xl font-bold text-white font-orbitron truncate">
                 {tokenSymbol} Price Chart
@@ -751,7 +827,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           </div>
 
           {/* Instructions */}
-          <div className="text-xs text-white/50 font-rajdhani p-4 text-center border-t border-white/20">
+          <div className="text-xs text-white/50 font-rajdhani p-4 text-center border-t border-white/20 flex-shrink-0">
             <div className="hidden sm:block">
               Scroll to zoom • Pinch to zoom on mobile • Click and drag to pan • Hover data points for details
             </div>
