@@ -34,9 +34,24 @@ export default function ZealousVolumeChart() {
     date: "",
     visible: false,
   })
+  const [containerWidth, setContainerWidth] = useState(600)
   const chartRef = useRef<HTMLDivElement>(null)
 
   const zealousAPI = new ZealousAPI()
+
+  // Update container width on mount and resize
+  useEffect(() => {
+    const updateWidth = () => {
+      if (chartRef.current) {
+        const rect = chartRef.current.getBoundingClientRect()
+        setContainerWidth(rect.width || 600)
+      }
+    }
+
+    updateWidth()
+    window.addEventListener("resize", updateWidth)
+    return () => window.removeEventListener("resize", updateWidth)
+  }, [])
 
   const formatCurrency = (value: number) => {
     if (value >= 1e9) {
@@ -110,12 +125,29 @@ export default function ZealousVolumeChart() {
     fetchVolumeData()
   }, [timeRange])
 
-  const handleBarHover = (event: React.MouseEvent, point: VolumeData, barX: number) => {
+  const handleBarHover = (event: React.MouseEvent | React.TouchEvent, point: VolumeData, barX: number) => {
     const rect = chartRef.current?.getBoundingClientRect()
     if (!rect) return
 
-    const x = event.clientX - rect.left
-    const y = event.clientY - rect.top
+    let clientX: number
+    let clientY: number
+
+    if ("touches" in event) {
+      // Touch event
+      if (event.touches.length > 0) {
+        clientX = event.touches[0].clientX
+        clientY = event.touches[0].clientY
+      } else {
+        return
+      }
+    } else {
+      // Mouse event
+      clientX = event.clientX
+      clientY = event.clientY
+    }
+
+    const x = clientX - rect.left
+    const y = clientY - rect.top
 
     setTooltip({
       x,
@@ -136,11 +168,22 @@ export default function ZealousVolumeChart() {
 
     const maxVolume = Math.max(...data.map((d) => d.volume))
     const chartHeight = 200
-    const chartWidth = 600
 
     return (
       <div className="w-full h-64 relative" ref={chartRef}>
-        <svg width="100%" height="100%" viewBox={`0 0 ${chartWidth} ${chartHeight}`} className="overflow-visible">
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${containerWidth} ${chartHeight}`}
+          className="overflow-visible"
+          style={{
+            userSelect: "none",
+            WebkitUserSelect: "none",
+            WebkitTouchCallout: "none",
+            WebkitTapHighlightColor: "transparent",
+            touchAction: "manipulation",
+          }}
+        >
           <defs>
             <linearGradient id="volumeGradient" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#8B5CF6" />
@@ -161,7 +204,7 @@ export default function ZealousVolumeChart() {
               key={ratio}
               x1="0"
               y1={chartHeight * ratio}
-              x2={chartWidth}
+              x2={containerWidth}
               y2={chartHeight * ratio}
               stroke="rgba(255,255,255,0.1)"
               strokeDasharray="2,2"
@@ -170,9 +213,9 @@ export default function ZealousVolumeChart() {
 
           {/* Volume bars */}
           {data.map((point, index) => {
-            const barWidth = (chartWidth / data.length) * 0.8
+            const barWidth = (containerWidth / data.length) * 0.8
             const barHeight = maxVolume > 0 ? (point.volume / maxVolume) * chartHeight : 0
-            const x = (index / data.length) * chartWidth + (chartWidth / data.length - barWidth) / 2
+            const x = (index / data.length) * containerWidth + (containerWidth / data.length - barWidth) / 2
             const y = chartHeight - barHeight
 
             return (
@@ -188,6 +231,14 @@ export default function ZealousVolumeChart() {
                 className="hover:opacity-80 transition-opacity cursor-pointer"
                 onMouseEnter={(e) => handleBarHover(e, point, x)}
                 onMouseLeave={closeTooltip}
+                onTouchStart={(e) => {
+                  e.preventDefault()
+                  handleBarHover(e, point, x)
+                }}
+                onTouchEnd={(e) => {
+                  e.preventDefault()
+                  setTimeout(closeTooltip, 2000) // Auto-close tooltip after 2 seconds on mobile
+                }}
               />
             )
           })}
@@ -229,7 +280,7 @@ export default function ZealousVolumeChart() {
             style={{
               left: tooltip.x + 10,
               top: tooltip.y - 10,
-              transform: tooltip.x > chartWidth / 2 ? "translateX(-100%)" : "none",
+              transform: tooltip.x > containerWidth / 2 ? "translateX(-100%)" : "none",
             }}
           >
             <button onClick={closeTooltip} className="absolute top-1 right-1 text-white/50 hover:text-white">
