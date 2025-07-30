@@ -63,25 +63,41 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     center: { x: number; y: number }
   } | null>(null)
   const [containerWidth, setContainerWidth] = useState(800)
+  const [containerHeight, setContainerHeight] = useState(300)
   const chartRef = useRef<HTMLDivElement>(null)
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
 
-  // Update container width on mount and resize
+  // Update container dimensions on mount and resize
   useEffect(() => {
-    const updateWidth = () => {
+    const updateDimensions = () => {
       const ref = isFullscreen ? fullscreenRef.current : chartRef.current
       if (ref) {
         const rect = ref.getBoundingClientRect()
         setContainerWidth(rect.width || 800)
+
+        if (isFullscreen) {
+          // For fullscreen, use most of the viewport height minus header/footer
+          const viewportHeight = window.innerHeight
+          const headerHeight = 120 // Approximate header height
+          const footerHeight = 80 // Approximate footer height
+          setContainerHeight(Math.max(300, viewportHeight - headerHeight - footerHeight))
+        } else {
+          setContainerHeight(300)
+        }
       }
     }
 
-    updateWidth()
-    window.addEventListener("resize", updateWidth)
-    return () => window.removeEventListener("resize", updateWidth)
+    updateDimensions()
+    window.addEventListener("resize", updateDimensions)
+    window.addEventListener("orientationchange", updateDimensions)
+
+    return () => {
+      window.removeEventListener("resize", updateDimensions)
+      window.removeEventListener("orientationchange", updateDimensions)
+    }
   }, [isFullscreen])
 
   const formatCurrency = (value: number | undefined | null) => {
@@ -362,6 +378,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const toggleFullscreen = () => {
     setIsFullscreen(!isFullscreen)
     closeTooltip()
+    // Reset zoom and pan when toggling fullscreen
+    setZoomLevel(1)
+    setPanOffset(0)
   }
 
   // Handle mouse wheel zoom with zoom center
@@ -388,7 +407,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     let newZoomLevel: number
     if (event.deltaY < 0) {
       // Scroll up - zoom in
-      newZoomLevel = Math.min(oldZoomLevel * 1.2, 5)
+      newZoomLevel = Math.min(oldZoomLevel * 1.2, 10)
     } else {
       // Scroll down - zoom out
       newZoomLevel = Math.max(oldZoomLevel / 1.2, 0.5)
@@ -494,7 +513,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       if (initialZoomData.distance > 0) {
         // Calculate zoom scale based on distance change
         const scaleChange = currentDistance / initialZoomData.distance
-        const newZoomLevel = Math.min(Math.max(initialZoomData.zoom * scaleChange, 0.5), 5)
+        const newZoomLevel = Math.min(Math.max(initialZoomData.zoom * scaleChange, 0.5), 10)
 
         // Calculate pan offset to keep zoom centered on pinch center
         const rect = fullscreenRef.current?.getBoundingClientRect()
@@ -554,7 +573,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     const priceRange = maxPrice - minPrice
     const padding = priceRange * 0.1
 
-    const chartHeight = isFullscreenMode ? (typeof window !== "undefined" ? window.innerHeight - 200 : 400) : 300
+    const chartHeight = containerHeight
     const containerRef = isFullscreenMode ? fullscreenRef : chartRef
 
     // Use dynamic container width for chart calculations
@@ -578,7 +597,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     let currentTransform = "none"
     if (isFullscreenMode) {
       const scaleX = zoomLevel
-      const translateX = panOffset
+      const translateX = panOffset / zoomLevel // Adjust translation for zoom level
       currentTransform = `scaleX(${scaleX}) translateX(${translateX}px)`
     }
 
@@ -603,6 +622,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           msUserSelect: "none",
           WebkitTouchCallout: "none",
           WebkitTapHighlightColor: "transparent",
+          height: isFullscreenMode ? `${containerHeight}px` : "320px",
         }}
       >
         <div
@@ -660,12 +680,12 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               d={pathData}
               fill="none"
               stroke="url(#priceGradient)"
-              strokeWidth="3"
+              strokeWidth={isFullscreenMode ? "4" : "3"}
               strokeLinecap="round"
               strokeLinejoin="round"
             />
 
-            {/* Data points */}
+            {/* Data points - larger for mobile fullscreen */}
             {validData.map((point, index) => {
               const x = (index / (validData.length - 1)) * chartWidth
               const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
@@ -674,7 +694,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                   key={index}
                   cx={x}
                   cy={y}
-                  r="6"
+                  r={isFullscreenMode ? "8" : "6"}
                   fill="url(#priceGradient)"
                   stroke="rgba(0,0,0,0.8)"
                   strokeWidth="2"
@@ -687,21 +707,22 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             })}
           </svg>
 
-          {/* Y-axis labels - fixed position for fullscreen */}
+          {/* Y-axis labels - better positioning for mobile fullscreen */}
           <div
             className="absolute top-0 h-full flex flex-col justify-between text-xs text-white/50 font-rajdhani pointer-events-none select-none"
             style={
               isFullscreenMode
                 ? {
                     position: "fixed",
-                    left: "0.5rem",
+                    left: "0.25rem",
                     top: "50%",
                     transform: "translateY(-50%)",
                     height: `${chartHeight}px`,
                     zIndex: 1000,
-                    backgroundColor: "rgba(0,0,0,0.8)",
-                    borderRadius: "0.25rem",
-                    padding: "0.25rem",
+                    backgroundColor: "rgba(0,0,0,0.9)",
+                    borderRadius: "0.5rem",
+                    padding: "0.5rem 0.25rem",
+                    fontSize: "0.75rem",
                   }
                 : {
                     left: "-4rem",
@@ -732,14 +753,14 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             )}
           </div>
 
-          {/* Tooltip */}
+          {/* Tooltip - better positioning for mobile */}
           {tooltip.visible && (
             <div
-              className="absolute z-50 bg-black/90 border border-white/20 rounded-lg p-3 text-white text-sm font-inter backdrop-blur-xl max-w-xs pointer-events-none select-none"
+              className="absolute z-50 bg-black/95 border border-white/20 rounded-lg p-3 text-white text-sm font-inter backdrop-blur-xl max-w-xs pointer-events-none select-none"
               style={{
-                left: tooltip.x + 10,
-                top: tooltip.y - 10,
-                transform: tooltip.x > chartWidth / 2 ? "translateX(-100%)" : "none",
+                left: Math.min(tooltip.x + 10, containerWidth - 200),
+                top: Math.max(tooltip.y - 80, 10),
+                transform: tooltip.x > containerWidth / 2 ? "translateX(-100%)" : "none",
               }}
             >
               <button
@@ -764,6 +785,13 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             </div>
           )}
         </div>
+
+        {/* Zoom level indicator for fullscreen */}
+        {isFullscreenMode && zoomLevel !== 1 && (
+          <div className="absolute top-4 right-4 bg-black/80 text-white text-xs px-2 py-1 rounded font-rajdhani pointer-events-none select-none">
+            Zoom: {zoomLevel.toFixed(1)}x
+          </div>
+        )}
       </div>
     )
   }
@@ -797,11 +825,11 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     )
   }
 
-  // Fullscreen overlay
+  // Fullscreen overlay - optimized for mobile
   if (isFullscreen) {
     return (
       <div
-        className="fixed inset-0 z-50 bg-black/95 backdrop-blur-xl"
+        className="fixed inset-0 z-50 bg-black/98 backdrop-blur-xl"
         style={{
           userSelect: "none",
           WebkitUserSelect: "none",
@@ -813,14 +841,25 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         }}
       >
         <div className="h-full flex flex-col">
-          {/* Header - Fixed height */}
-          <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border-b border-white/20 gap-2 sm:gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
-              <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white font-orbitron truncate">
+          {/* Header - Compact for mobile */}
+          <div className="flex-shrink-0 flex flex-col gap-2 p-3 border-b border-white/20">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-bold text-white font-orbitron truncate flex-1 mr-2">
                 {tokenSymbol} Price Chart
               </h2>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 lg:gap-4">
-                <div className="text-sm sm:text-base lg:text-lg font-bold text-white font-orbitron">
+              <Button
+                variant="outline"
+                onClick={toggleFullscreen}
+                className="bg-black/40 border-white/20 text-white hover:bg-white/10 p-2 flex-shrink-0"
+                size="sm"
+              >
+                <Minimize2 className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0 flex-1">
+                <div className="text-base sm:text-lg font-bold text-white font-orbitron truncate">
                   {formatCurrency(currentPrice)}
                 </div>
                 <div className={`flex items-center gap-1 ${priceChange >= 0 ? "text-purple-400" : "text-pink-400"}`}>
@@ -832,10 +871,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                   <span className="font-orbitron text-sm sm:text-base">{formatPercent(priceChange)}</span>
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+
               <Select value={timeRange} onValueChange={(value) => setTimeRange(value as typeof timeRange)}>
-                <SelectTrigger className="w-16 sm:w-20 lg:w-24 bg-black/40 border-white/20 text-white text-xs sm:text-sm">
+                <SelectTrigger className="w-20 bg-black/40 border-white/20 text-white text-sm flex-shrink-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-black/90 border-white/20 text-white">
@@ -847,24 +885,16 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                   <SelectItem value="ALL">ALL</SelectItem>
                 </SelectContent>
               </Select>
-              <Button
-                variant="outline"
-                onClick={toggleFullscreen}
-                className="bg-black/40 border-white/20 text-white hover:bg-white/10 p-2"
-                size="sm"
-              >
-                <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
             </div>
           </div>
 
-          {/* Chart - Flexible height */}
-          <div className="flex-1 overflow-hidden pl-4 sm:pl-16 lg:pl-20 pr-2 sm:pr-4 py-2 sm:py-4">
+          {/* Chart - Flexible height with proper mobile spacing */}
+          <div className="flex-1 overflow-hidden pl-4 sm:pl-16 lg:pl-20 pr-2 sm:pr-4 py-2">
             <CustomChart data={priceData} isFullscreenMode={true} />
           </div>
 
-          {/* Instructions - Fixed height */}
-          <div className="flex-shrink-0 text-xs text-white/50 font-rajdhani p-2 sm:p-4 text-center border-t border-white/20">
+          {/* Instructions - Compact for mobile */}
+          <div className="flex-shrink-0 text-xs text-white/50 font-rajdhani p-2 text-center border-t border-white/20">
             <div className="hidden sm:block">
               Scroll to zoom • Pinch to zoom on mobile • Click and drag to pan • Hover data points for details
             </div>
