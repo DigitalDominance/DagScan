@@ -125,20 +125,27 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
               <span className="text-sm text-white/70 font-rajdhani">Network:</span>
               <div className="flex rounded-lg bg-white/10 p-1">
                 <Button
-                  variant="default"
+                  variant={currentNetwork === "kasplex" ? "default" : "ghost"}
                   size="sm"
-                  className="text-xs bg-gradient-to-r from-purple-500 to-blue-500 text-white font-rajdhani font-semibold"
+                  onClick={() => onNetworkChange("kasplex")}
+                  className={`text-xs font-rajdhani font-semibold px-3 py-1 relative ${
+                    currentNetwork === "kasplex"
+                      ? "bg-black/60 text-white border border-transparent before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-purple-500 before:to-blue-500 before:-z-10"
+                      : "text-white/70 hover:text-white bg-black/40 hover:bg-black/60 border border-transparent hover:before:absolute hover:before:inset-0 hover:before:rounded-md hover:before:p-[1px] hover:before:bg-gradient-to-r hover:before:from-purple-500 hover:before:to-blue-500 hover:before:-z-10 hover:before:opacity-50"
+                  } transition-all duration-300`}
                 >
-                  Kasplex
+                  <span className="relative z-10">
+                    <img src="/kasplex-logo.png" alt="Kasplex" className="h-4 w-auto" />
+                  </span>
                 </Button>
                 <div className="relative group">
                   <Button
                     variant="ghost"
                     size="sm"
                     disabled
-                    className="text-xs text-white/30 cursor-not-allowed font-rajdhani"
+                    className="text-xs text-white/30 cursor-not-allowed font-rajdhani px-3 py-1"
                   >
-                    Igra
+                    <img src="/igra-logo.png" alt="Igra" className="h-4 w-auto opacity-30" />
                   </Button>
                   <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
                     Coming Soon
@@ -158,7 +165,7 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setShowSuggestions(searchSuggestions.length > 0)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="w-80 rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-rajdhani"
+                  className="w-80 rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-orbitron"
                 />
                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/50" />
               </form>
@@ -177,6 +184,15 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                   ))}
                 </div>
               )}
+            </div>
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/dapps")}
+                className="text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
+              >
+                <span className="relative z-10">DApps</span>
+              </Button>
             </div>
           </div>
 
@@ -199,20 +215,25 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                 <span className="text-sm text-white/70 font-rajdhani">Network:</span>
                 <div className="flex rounded-lg bg-white/10 p-1">
                   <Button
-                    variant="default"
+                    variant={currentNetwork === "kasplex" ? "default" : "ghost"}
                     size="sm"
-                    className="text-xs bg-gradient-to-r from-purple-500 to-blue-500 text-white font-rajdhani font-semibold"
+                    onClick={() => onNetworkChange("kasplex")}
+                    className={`text-xs font-rajdhani font-semibold px-3 py-1 ${
+                      currentNetwork === "kasplex"
+                        ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white"
+                        : "text-white/70 hover:text-white"
+                    }`}
                   >
-                    Kasplex
+                    <img src="/kasplex-logo.png" alt="Kasplex" className="h-4 w-auto" />
                   </Button>
                   <div className="relative group">
                     <Button
                       variant="ghost"
                       size="sm"
                       disabled
-                      className="text-xs text-white/30 cursor-not-allowed font-rajdhani"
+                      className="text-xs text-white/30 cursor-not-allowed font-rajdhani px-3 py-1"
                     >
-                      Igra
+                      <img src="/igra-logo.png" alt="Igra" className="h-4 w-auto opacity-30" />
                     </Button>
                     <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
                       Coming Soon
@@ -230,7 +251,7 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => setShowSuggestions(searchSuggestions.length > 0)}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                    className="w-full rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-rajdhani"
+                    className="w-full rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-orbitron"
                   />
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/50" />
                 </form>
@@ -250,6 +271,13 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                   </div>
                 )}
               </div>
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/dapps")}
+                className="w-full justify-start text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
+              >
+                <span className="relative z-10">DApps</span>
+              </Button>
             </div>
           </motion.div>
         )}

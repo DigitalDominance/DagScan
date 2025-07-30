@@ -160,7 +160,7 @@ class KasplexAPI {
     return null
   }
 
-  private async rpcCall<T>(method: string, params: any[] = [], retries = 3): Promise<T> {
+  async rpcCall<T>(method: string, params: any[] = [], retries = 3): Promise<T> {
     if (this.useMockData) {
       return this.getMockResponse<T>(method, params)
     }
@@ -257,6 +257,9 @@ class KasplexAPI {
 
       case "eth_getTransactionCount":
         return "0xa" as T
+
+      case "eth_call":
+        return "0x0" as T
 
       case "eth_getLogs":
         return [
