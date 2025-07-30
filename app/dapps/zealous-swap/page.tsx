@@ -1,0 +1,207 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { motion } from "motion/react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ArrowLeft, DollarSign, Activity, ExternalLink, Droplets, Coins } from "lucide-react"
+import BeamsBackground from "@/components/beams-background"
+import Navigation from "@/components/navigation"
+import Footer from "@/components/footer"
+import ZealousVolumeChart from "@/components/zealous-volume-chart"
+import ZealousPoolsTable from "@/components/zealous-pools-table"
+import ZealousTokensList from "@/components/zealous-tokens-list"
+import { ZealousAPI, type ProtocolStats } from "@/lib/zealous-api"
+import { useRouter } from "next/navigation"
+
+export default function ZealousSwapPage() {
+  const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
+
+  const zealousAPI = new ZealousAPI()
+
+  useEffect(() => {
+    const fetchProtocolStats = async () => {
+      try {
+        setLoading(true)
+        const stats = await zealousAPI.getProtocolStats()
+        setProtocolStats(stats)
+      } catch (err) {
+        console.error("Failed to fetch protocol stats:", err)
+        setError("Failed to load protocol statistics")
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProtocolStats()
+  }, [])
+
+  const handleSearch = (query: string) => {
+    router.push(`/search/${encodeURIComponent(query)}`)
+  }
+
+  const formatCurrency = (value: number | undefined | null) => {
+    if (value === undefined || value === null || isNaN(value)) {
+      return "$0.00"
+    }
+    if (value >= 1e9) {
+      return `$${(value / 1e9).toFixed(2)}B`
+    }
+    if (value >= 1e6) {
+      return `$${(value / 1e6).toFixed(2)}M`
+    } else if (value >= 1e3) {
+      return `$${(value / 1e3).toFixed(2)}K`
+    }
+    if (value >= 1) {
+      return `$${value.toFixed(6)}`
+    }
+    if (value >= 0.001) {
+      return `$${value.toFixed(8)}`
+    }
+    return `$${value.toFixed(12)}`
+  }
+
+  return (
+    <BeamsBackground>
+      <div className="min-h-screen flex flex-col font-inter">
+        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+
+        <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
+          {/* Header */}
+          <div className="mb-6">
+            <Button
+              variant="ghost"
+              onClick={() => router.push("/dapps")}
+              className="text-white/70 hover:text-white mb-4"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to DApps
+            </Button>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+            >
+              <div className="flex items-center gap-4">
+                <img src="/zealous-logo.png" alt="Zealous Swap" className="h-16 w-16 rounded-xl" />
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-bold text-white font-orbitron">Zealous Swap</h1>
+                  <p className="text-white/70 font-rajdhani text-lg">Decentralized Exchange on Kasplex</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Active</Badge>
+                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">DEX</Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <Button
+                  className="bg-gradient-to-r from-green-500 to-blue-500 text-white font-rajdhani"
+                  onClick={() => window.open("https://www.zealousswap.com/", "_blank")}
+                >
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  Launch App
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+
+          {/* Protocol Stats */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+          >
+            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Total TVL</CardTitle>
+                <DollarSign className="h-4 w-4 text-green-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white font-orbitron">
+                  {loading ? "Loading..." : error ? "Error" : formatCurrency(protocolStats?.totalTVL || 0)}
+                </div>
+                <p className="text-xs text-green-300 mt-1 font-inter">Total Value Locked</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Total Volume</CardTitle>
+                <Activity className="h-4 w-4 text-blue-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white font-orbitron">
+                  {loading ? "Loading..." : error ? "Error" : formatCurrency(protocolStats?.totalVolumeUSD || 0)}
+                </div>
+                <p className="text-xs text-blue-300 mt-1 font-inter">All-time volume</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Active Pools</CardTitle>
+                <Droplets className="h-4 w-4 text-purple-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white font-orbitron">
+                  {loading ? "Loading..." : error ? "Error" : protocolStats?.poolCount || 0}
+                </div>
+                <p className="text-xs text-purple-300 mt-1 font-inter">Liquidity pools</p>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Volume Chart */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="mb-8"
+          >
+            <ZealousVolumeChart />
+          </motion.div>
+
+          {/* Pools and Tokens Tabs */}
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
+            <Tabs defaultValue="tokens" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-2 bg-black/40 border-white/20">
+                <TabsTrigger
+                  value="tokens"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-white/70 font-rajdhani"
+                >
+                  <Coins className="h-4 w-4 mr-2" />
+                  Tokens
+                </TabsTrigger>
+                <TabsTrigger
+                  value="pools"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-white/70 font-rajdhani"
+                >
+                  <Droplets className="h-4 w-4 mr-2" />
+                  Pools
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="tokens">
+                <ZealousTokensList />
+              </TabsContent>
+
+              <TabsContent value="pools">
+                <ZealousPoolsTable />
+              </TabsContent>
+            </Tabs>
+          </motion.div>
+        </main>
+
+        <Footer />
+      </div>
+    </BeamsBackground>
+  )
+}
