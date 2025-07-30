@@ -62,11 +62,27 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     distance: number
     center: { x: number; y: number }
   } | null>(null)
+  const [containerWidth, setContainerWidth] = useState(800)
   const chartRef = useRef<HTMLDivElement>(null)
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
+
+  // Update container width on mount and resize
+  useEffect(() => {
+    const updateWidth = () => {
+      const ref = isFullscreen ? fullscreenRef.current : chartRef.current
+      if (ref) {
+        const rect = ref.getBoundingClientRect()
+        setContainerWidth(rect.width || 800)
+      }
+    }
+
+    updateWidth()
+    window.addEventListener("resize", updateWidth)
+    return () => window.removeEventListener("resize", updateWidth)
+  }, [isFullscreen])
 
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null || isNaN(value)) {
@@ -540,21 +556,23 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
 
     const chartHeight = isFullscreenMode ? (typeof window !== "undefined" ? window.innerHeight - 200 : 400) : 300
     const containerRef = isFullscreenMode ? fullscreenRef : chartRef
-    const baseChartWidth = 800
+
+    // Use dynamic container width for chart calculations
+    const chartWidth = containerWidth - (isFullscreenMode ? 80 : 64) // Account for padding
 
     const isShortRange = timeRange === "1H" || timeRange === "24H"
 
     // Create SVG path for the price line
     const pathData = validData
       .map((point, index) => {
-        const x = (index / (validData.length - 1)) * baseChartWidth
+        const x = (index / (validData.length - 1)) * chartWidth
         const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
         return `${index === 0 ? "M" : "L"} ${x} ${y}`
       })
       .join(" ")
 
     // Create area path for gradient fill
-    const areaData = `${pathData} L ${baseChartWidth} ${chartHeight} L 0 ${chartHeight} Z`
+    const areaData = `${pathData} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`
 
     // Calculate transform for zoom and pan
     let currentTransform = "none"
@@ -592,14 +610,14 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           style={{
             transform: currentTransform,
             transformOrigin: "left center",
-            width: `${baseChartWidth}px`,
+            width: "100%",
             minWidth: "100%",
           }}
         >
           <svg
             width="100%"
             height="100%"
-            viewBox={`0 0 ${baseChartWidth} ${chartHeight}`}
+            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
             className="overflow-visible"
             preserveAspectRatio="none"
             style={{
@@ -627,7 +645,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 key={ratio}
                 x1="0"
                 y1={chartHeight * ratio}
-                x2={baseChartWidth}
+                x2={chartWidth}
                 y2={chartHeight * ratio}
                 stroke="rgba(255,255,255,0.1)"
                 strokeDasharray="2,2"
@@ -649,7 +667,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
 
             {/* Data points */}
             {validData.map((point, index) => {
-              const x = (index / (validData.length - 1)) * baseChartWidth
+              const x = (index / (validData.length - 1)) * chartWidth
               const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
               return (
                 <circle
@@ -721,7 +739,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               style={{
                 left: tooltip.x + 10,
                 top: tooltip.y - 10,
-                transform: tooltip.x > baseChartWidth / 2 ? "translateX(-100%)" : "none",
+                transform: tooltip.x > chartWidth / 2 ? "translateX(-100%)" : "none",
               }}
             >
               <button
