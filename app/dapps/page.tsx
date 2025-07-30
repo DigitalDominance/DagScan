@@ -301,38 +301,6 @@ export default function DAppsPage() {
               </motion.div>
             ))}
           </motion.div>
-
-          {/* Coming Soon Section */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5 }}
-            className="mt-16 text-center"
-          >
-            <Card className="bg-gradient-to-r from-purple-900/20 via-blue-900/20 to-pink-900/20 border-white/10 backdrop-blur-xl">
-              <CardContent className="p-8">
-                <h3 className="text-2xl font-bold text-white mb-4 font-orbitron">Building the Future of DeFi</h3>
-                <p className="text-white/70 mb-6 font-rajdhani text-lg max-w-2xl mx-auto">
-                  The Kaspa EVM ecosystem is rapidly expanding. More innovative DApps are launching soon, bringing new
-                  opportunities for users and developers alike.
-                </p>
-                <div className="flex flex-wrap justify-center gap-4">
-                  <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 px-4 py-2">
-                    Gaming Protocols
-                  </Badge>
-                  <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 px-4 py-2">
-                    Derivatives Trading
-                  </Badge>
-                  <Badge className="bg-pink-500/20 text-pink-300 border-pink-500/30 px-4 py-2">
-                    Insurance Protocols
-                  </Badge>
-                  <Badge className="bg-green-500/20 text-green-300 border-green-500/30 px-4 py-2">
-                    Yield Aggregators
-                  </Badge>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
         </main>
 
         <Footer />
