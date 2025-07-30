@@ -122,7 +122,48 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-white/70 font-rajdhani">Network:</span>
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/dapps")}
+                className="text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
+              >
+                <span className="relative z-10">DApps</span>
+              </Button>
+            </div>
+
+            {/* Search */}
+            <div className="relative">
+              <form onSubmit={handleSearch} className="relative">
+                <input
+                  type="text"
+                  placeholder="Search blocks, txns, addresses..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setShowSuggestions(searchSuggestions.length > 0)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  className="w-80 rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-orbitron text-sm"
+                />
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/50" />
+              </form>
+
+              {/* Search Suggestions */}
+              {showSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden z-50">
+                  {searchSuggestions.map((suggestion, index) => (
+                    <button
+                      key={index}
+                      onClick={() => handleSuggestionClick(suggestion)}
+                      className="w-full px-4 py-2 text-left text-white hover:bg-white/10 transition-colors font-inter text-sm"
+                    >
+                      {suggestion.display}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-white/70 font-orbitron">Network:</span>
               <div className="flex rounded-lg bg-white/10 p-1">
                 <Button
                   variant={currentNetwork === "kasplex" ? "default" : "ghost"}
@@ -154,46 +195,6 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                 </div>
               </div>
             </div>
-
-            {/* Search */}
-            <div className="relative">
-              <form onSubmit={handleSearch} className="relative">
-                <input
-                  type="text"
-                  placeholder="Search blocks, txns, addresses..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onFocus={() => setShowSuggestions(searchSuggestions.length > 0)}
-                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                  className="w-80 rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-orbitron"
-                />
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/50" />
-              </form>
-
-              {/* Search Suggestions */}
-              {showSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden z-50">
-                  {searchSuggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full px-4 py-2 text-left text-white hover:bg-white/10 transition-colors font-inter text-sm"
-                    >
-                      {suggestion.display}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => router.push("/dapps")}
-                className="text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
-              >
-                <span className="relative z-10">DApps</span>
-              </Button>
-            </div>
           </div>
 
           {/* Mobile menu button */}
@@ -211,8 +212,16 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
             className="md:hidden border-t border-white/10 py-4"
           >
             <div className="space-y-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/dapps")}
+                className="w-full justify-start text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
+              >
+                <span className="relative z-10">DApps</span>
+              </Button>
+
               <div className="flex items-center justify-between">
-                <span className="text-sm text-white/70 font-rajdhani">Network:</span>
+                <span className="text-sm text-white/70 font-orbitron">Network:</span>
                 <div className="flex rounded-lg bg-white/10 p-1">
                   <Button
                     variant={currentNetwork === "kasplex" ? "default" : "ghost"}
@@ -251,7 +260,7 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                     onChange={(e) => setSearchQuery(e.target.value)}
                     onFocus={() => setShowSuggestions(searchSuggestions.length > 0)}
                     onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-                    className="w-full rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-orbitron"
+                    className="w-full rounded-lg bg-white/10 px-4 py-2 pl-10 text-white placeholder-white/50 backdrop-blur-sm focus:bg-white/20 focus:outline-none focus:ring-2 focus:ring-purple-500 font-orbitron text-sm"
                   />
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/50" />
                 </form>
@@ -271,13 +280,6 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                   </div>
                 )}
               </div>
-              <Button
-                variant="ghost"
-                onClick={() => router.push("/dapps")}
-                className="w-full justify-start text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
-              >
-                <span className="relative z-10">DApps</span>
-              </Button>
             </div>
           </motion.div>
         )}
