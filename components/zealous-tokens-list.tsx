@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react"
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
