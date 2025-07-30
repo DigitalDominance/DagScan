@@ -56,6 +56,12 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const [dragStart, setDragStart] = useState<{ x: number; panOffset: number }>({ x: 0, panOffset: 0 })
   const [lastTouchDistance, setLastTouchDistance] = useState<number>(0)
   const [isZooming, setIsZooming] = useState(false)
+  const [initialZoomData, setInitialZoomData] = useState<{
+    zoom: number
+    pan: number
+    distance: number
+    center: { x: number; y: number }
+  } | null>(null)
   const chartRef = useRef<HTMLDivElement>(null)
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
@@ -143,20 +149,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     }
     fetchSupply()
   }, [tokenAddress])
-
-  const [containerWidth, setContainerWidth] = useState(600)
-
-  useEffect(() => {
-    const updateWidth = () => {
-      if (chartRef.current) {
-        setContainerWidth(chartRef.current.clientWidth)
-      }
-    }
-
-    updateWidth()
-    window.addEventListener("resize", updateWidth)
-    return () => window.removeEventListener("resize", updateWidth)
-  }, [])
 
   useEffect(() => {
     const fetchPriceData = async () => {
@@ -446,16 +438,27 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     event.stopPropagation()
 
     if (event.touches.length === 2) {
-      // Two finger pinch
+      // Two finger pinch - start zoom
       const distance = getTouchDistance(event.touches)
-      setLastTouchDistance(distance)
+      const center = getTouchCenter(event.touches)
+
       setIsZooming(true)
       setIsDragging(false)
+      setLastTouchDistance(distance)
+
+      // Store initial zoom data
+      setInitialZoomData({
+        zoom: zoomLevel,
+        pan: panOffset,
+        distance: distance,
+        center: center,
+      })
     } else if (event.touches.length === 1) {
-      // Single finger drag
+      // Single finger - start drag
       setIsDragging(true)
       setIsZooming(false)
       setDragStart({ x: event.touches[0].clientX, panOffset })
+      setInitialZoomData(null)
       closeTooltip()
     }
   }
@@ -467,28 +470,31 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     event.preventDefault()
     event.stopPropagation()
 
-    if (event.touches.length === 2 && isZooming && lastTouchDistance > 0) {
+    if (event.touches.length === 2 && isZooming && initialZoomData) {
       // Two finger pinch zoom
-      const distance = getTouchDistance(event.touches)
-      const center = getTouchCenter(event.touches)
+      const currentDistance = getTouchDistance(event.touches)
+      const currentCenter = getTouchCenter(event.touches)
 
-      const rect = fullscreenRef.current?.getBoundingClientRect()
-      if (!rect) return
+      if (initialZoomData.distance > 0) {
+        // Calculate zoom scale based on distance change
+        const scaleChange = currentDistance / initialZoomData.distance
+        const newZoomLevel = Math.min(Math.max(initialZoomData.zoom * scaleChange, 0.5), 5)
 
-      const scale = distance / lastTouchDistance
-      const newZoomLevel = Math.min(Math.max(zoomLevel * scale, 0.5), 5)
+        // Calculate pan offset to keep zoom centered on pinch center
+        const rect = fullscreenRef.current?.getBoundingClientRect()
+        if (rect) {
+          const centerX = currentCenter.x - rect.left
+          const containerWidth = rect.width
+          const zoomPoint = centerX / containerWidth
 
-      // Calculate pan offset to keep zoom centered on pinch center
-      const centerX = center.x - rect.left
-      const containerWidth = rect.width
-      const zoomPoint = centerX / containerWidth
+          // Adjust pan to keep the zoom point stable
+          const zoomRatio = newZoomLevel / zoomLevel
+          const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
 
-      const zoomRatio = newZoomLevel / zoomLevel
-      const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
-
-      setZoomLevel(newZoomLevel)
-      setPanOffset(newPanOffset)
-      setLastTouchDistance(distance)
+          setZoomLevel(newZoomLevel)
+          setPanOffset(newPanOffset)
+        }
+      }
     } else if (event.touches.length === 1 && isDragging && !isZooming) {
       // Single finger drag
       const deltaX = event.touches[0].clientX - dragStart.x
@@ -509,12 +515,14 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       setLastTouchDistance(0)
       setIsDragging(false)
       setIsZooming(false)
+      setInitialZoomData(null)
     } else if (event.touches.length === 1 && isZooming) {
       // One finger remaining after pinch, switch to drag mode
       setLastTouchDistance(0)
       setIsZooming(false)
       setIsDragging(true)
       setDragStart({ x: event.touches[0].clientX, panOffset })
+      setInitialZoomData(null)
     }
   }
 
@@ -530,12 +538,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     const priceRange = maxPrice - minPrice
     const padding = priceRange * 0.1
 
-    const chartHeight = isFullscreenMode ? window.innerHeight - 200 : 300
+    const chartHeight = isFullscreenMode ? (typeof window !== "undefined" ? window.innerHeight - 200 : 400) : 300
     const containerRef = isFullscreenMode ? fullscreenRef : chartRef
-
-    // Always use full container width, ensure minimum width and account for padding
-    const baseChartWidth = Math.max(containerWidth - (isFullscreenMode ? 80 : 64), 300)
-    const chartWidth = isFullscreenMode ? baseChartWidth * zoomLevel : baseChartWidth
+    const baseChartWidth = 800
 
     const isShortRange = timeRange === "1H" || timeRange === "24H"
 
@@ -551,10 +556,12 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     // Create area path for gradient fill
     const areaData = `${pathData} L ${baseChartWidth} ${chartHeight} L 0 ${chartHeight} Z`
 
-    // Calculate transform
+    // Calculate transform for zoom and pan
     let currentTransform = "none"
-    if (isFullscreenMode && zoomLevel !== 1) {
-      currentTransform = `translateX(${panOffset}px) scaleX(${zoomLevel})`
+    if (isFullscreenMode) {
+      const scaleX = zoomLevel
+      const translateX = panOffset
+      currentTransform = `scaleX(${scaleX}) translateX(${translateX}px)`
     }
 
     return (
@@ -583,22 +590,21 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         <div
           className="h-full w-full"
           style={{
-            width: `${baseChartWidth}px`,
             transform: currentTransform,
             transformOrigin: "left center",
+            width: `${baseChartWidth}px`,
+            minWidth: "100%",
           }}
         >
           <svg
-            width={baseChartWidth}
-            height={chartHeight}
+            width="100%"
+            height="100%"
             viewBox={`0 0 ${baseChartWidth} ${chartHeight}`}
             className="overflow-visible"
             preserveAspectRatio="none"
             style={{
               userSelect: "none",
               WebkitUserSelect: "none",
-              width: "100%",
-              height: "100%",
             }}
           >
             <defs>
@@ -655,19 +661,17 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                   stroke="rgba(0,0,0,0.8)"
                   strokeWidth="2"
                   className="opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={(e) => !isFullscreenMode && handleChartClick(e, point)}
-                  onMouseEnter={(e) => !isFullscreenMode && handleChartHover(e, point)}
-                  onMouseLeave={() => !isFullscreenMode && closeTooltip()}
+                  onClick={(e) => handleChartClick(e, point)}
+                  onMouseEnter={(e) => handleChartHover(e, point)}
+                  onMouseLeave={() => closeTooltip()}
                 />
               )
             })}
           </svg>
 
-          {/* Y-axis labels - improved mobile positioning */}
+          {/* Y-axis labels - fixed position for fullscreen */}
           <div
-            className={`absolute top-0 h-full flex flex-col justify-between text-xs text-white/50 font-rajdhani pointer-events-none select-none ${
-              isFullscreenMode ? "left-2 sm:left-4 z-10" : "left-0 -ml-12 sm:-ml-16"
-            }`}
+            className="absolute top-0 h-full flex flex-col justify-between text-xs text-white/50 font-rajdhani pointer-events-none select-none"
             style={
               isFullscreenMode
                 ? {
@@ -676,12 +680,14 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                     top: "50%",
                     transform: "translateY(-50%)",
                     height: `${chartHeight}px`,
-                    zIndex: 10,
+                    zIndex: 1000,
                     backgroundColor: "rgba(0,0,0,0.8)",
                     borderRadius: "0.25rem",
                     padding: "0.25rem",
                   }
-                : {}
+                : {
+                    left: "-4rem",
+                  }
             }
           >
             <span className="text-xs">{formatCurrency(maxPrice + padding)}</span>
@@ -785,58 +791,68 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           msUserSelect: "none",
           WebkitTouchCallout: "none",
           WebkitTapHighlightColor: "transparent",
+          touchAction: "none",
         }}
       >
         <div className="h-full flex flex-col">
-          {/* Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border-b border-white/20 gap-4 flex-shrink-0">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-              <h2 className="text-lg sm:text-xl font-bold text-white font-orbitron truncate">
+          {/* Header - Fixed height */}
+          <div className="flex-shrink-0 flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border-b border-white/20 gap-2 sm:gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 min-w-0">
+              <h2 className="text-base sm:text-lg lg:text-xl font-bold text-white font-orbitron truncate">
                 {tokenSymbol} Price Chart
               </h2>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                <div className="text-lg font-bold text-white font-orbitron">{formatCurrency(currentPrice)}</div>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 lg:gap-4">
+                <div className="text-sm sm:text-base lg:text-lg font-bold text-white font-orbitron">
+                  {formatCurrency(currentPrice)}
+                </div>
                 <div className={`flex items-center gap-1 ${priceChange >= 0 ? "text-purple-400" : "text-pink-400"}`}>
-                  {priceChange >= 0 ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                  <span className="font-orbitron">{formatPercent(priceChange)}</span>
+                  {priceChange >= 0 ? (
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
+                  )}
+                  <span className="font-orbitron text-sm sm:text-base">{formatPercent(priceChange)}</span>
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Select value={timeRange} onValueChange={(value) => setTimeRange(value as typeof timeRange)}>
-                <SelectTrigger className="w-24 sm:w-32 bg-black/40 border-white/20 text-white">
+                <SelectTrigger className="w-16 sm:w-20 lg:w-24 bg-black/40 border-white/20 text-white text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent className="bg-black/90 border-white/20 text-white">
-                  <SelectItem value="1H">1 Hour</SelectItem>
-                  <SelectItem value="24H">24 Hours</SelectItem>
-                  <SelectItem value="7D">7 Days</SelectItem>
-                  <SelectItem value="30D">30 Days</SelectItem>
-                  <SelectItem value="90D">90 Days</SelectItem>
-                  <SelectItem value="ALL">All Time</SelectItem>
+                  <SelectItem value="1H">1H</SelectItem>
+                  <SelectItem value="24H">24H</SelectItem>
+                  <SelectItem value="7D">7D</SelectItem>
+                  <SelectItem value="30D">30D</SelectItem>
+                  <SelectItem value="90D">90D</SelectItem>
+                  <SelectItem value="ALL">ALL</SelectItem>
                 </SelectContent>
               </Select>
               <Button
                 variant="outline"
                 onClick={toggleFullscreen}
-                className="bg-black/40 border-white/20 text-white hover:bg-white/10"
+                className="bg-black/40 border-white/20 text-white hover:bg-white/10 p-2"
+                size="sm"
               >
-                <Minimize2 className="h-4 w-4" />
+                <Minimize2 className="h-3 w-3 sm:h-4 sm:w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Chart */}
-          <div className="flex-1 pl-4 sm:pl-20 pr-4 py-4 overflow-hidden">
+          {/* Chart - Flexible height */}
+          <div className="flex-1 overflow-hidden pl-4 sm:pl-16 lg:pl-20 pr-2 sm:pr-4 py-2 sm:py-4">
             <CustomChart data={priceData} isFullscreenMode={true} />
           </div>
 
-          {/* Instructions */}
-          <div className="text-xs text-white/50 font-rajdhani p-4 text-center border-t border-white/20 flex-shrink-0">
+          {/* Instructions - Fixed height */}
+          <div className="flex-shrink-0 text-xs text-white/50 font-rajdhani p-2 sm:p-4 text-center border-t border-white/20">
             <div className="hidden sm:block">
               Scroll to zoom • Pinch to zoom on mobile • Click and drag to pan • Hover data points for details
             </div>
-            <div className="sm:hidden">Pinch to zoom • Drag to pan • Tap data points for details</div>
+            <div className="sm:hidden">
+              Pinch with two fingers to zoom • Drag with one finger to pan • Tap data points for details
+            </div>
           </div>
         </div>
       </div>
