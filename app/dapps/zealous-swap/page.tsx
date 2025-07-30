@@ -112,12 +112,12 @@ export default function ZealousSwapPage() {
             </motion.div>
           </div>
 
-          {/* Protocol Stats */}
+          {/* Protocol Stats - 2 on top row, 1 on bottom for mobile */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8"
+            className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8"
           >
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -145,7 +145,7 @@ export default function ZealousSwapPage() {
               </CardContent>
             </Card>
 
-            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
+            <Card className="bg-black/40 border-white/20 backdrop-blur-xl col-span-2 md:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Active Pools</CardTitle>
                 <Droplets className="h-4 w-4 text-purple-400" />
