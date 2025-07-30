@@ -55,12 +55,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ x: number; panOffset: number }>({ x: 0, panOffset: 0 })
   const [lastTouchDistance, setLastTouchDistance] = useState<number>(0)
-  const [lastTouchCenter, setLastTouchCenter] = useState<{ x: number; y: number }>({ x: 0, y: 0 })
-  const [initialPinchData, setInitialPinchData] = useState<{
-    zoom: number
-    pan: number
-    center: { x: number; y: number }
-  } | null>(null)
+  const [isZooming, setIsZooming] = useState(false)
   const chartRef = useRef<HTMLDivElement>(null)
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
@@ -148,6 +143,20 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     }
     fetchSupply()
   }, [tokenAddress])
+
+  const [containerWidth, setContainerWidth] = useState(600)
+
+  useEffect(() => {
+    const updateWidth = () => {
+      if (chartRef.current) {
+        setContainerWidth(chartRef.current.clientWidth)
+      }
+    }
+
+    updateWidth()
+    window.addEventListener("resize", updateWidth)
+    return () => window.removeEventListener("resize", updateWidth)
+  }, [])
 
   useEffect(() => {
     const fetchPriceData = async () => {
@@ -300,7 +309,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   }, [timeRange, isFullscreen])
 
   const handleChartHover = (event: React.MouseEvent, point: ChartPoint) => {
-    if (isDragging) return
+    if (isDragging || isZooming) return
 
     const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
     if (!rect) return
@@ -319,8 +328,8 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   }
 
   const handleChartClick = (event: React.MouseEvent, point: ChartPoint) => {
-    // Only show tooltip if we weren't dragging
-    if (isDragging) return
+    // Only show tooltip if we weren't dragging or zooming
+    if (isDragging || isZooming) return
 
     const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
     if (!rect) return
@@ -434,24 +443,19 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     if (!isFullscreen) return
 
     event.preventDefault()
+    event.stopPropagation()
 
     if (event.touches.length === 2) {
       // Two finger pinch
       const distance = getTouchDistance(event.touches)
-      const center = getTouchCenter(event.touches)
       setLastTouchDistance(distance)
-      setLastTouchCenter(center)
-      setInitialPinchData({
-        zoom: zoomLevel,
-        pan: panOffset,
-        center: center,
-      })
+      setIsZooming(true)
       setIsDragging(false)
     } else if (event.touches.length === 1) {
       // Single finger drag
       setIsDragging(true)
+      setIsZooming(false)
       setDragStart({ x: event.touches[0].clientX, panOffset })
-      setInitialPinchData(null)
       closeTooltip()
     }
   }
@@ -463,28 +467,29 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     event.preventDefault()
     event.stopPropagation()
 
-    if (event.touches.length === 2 && lastTouchDistance > 0 && initialPinchData) {
+    if (event.touches.length === 2 && isZooming && lastTouchDistance > 0) {
       // Two finger pinch zoom
       const distance = getTouchDistance(event.touches)
       const center = getTouchCenter(event.touches)
 
-      const scale = distance / lastTouchDistance
-      const newZoomLevel = Math.min(Math.max(initialPinchData.zoom * scale, 0.5), 5)
-
-      // Calculate pan offset to keep zoom centered
       const rect = fullscreenRef.current?.getBoundingClientRect()
-      if (rect) {
-        const centerX = center.x - rect.left
-        const containerWidth = rect.width
-        const zoomPoint = centerX / containerWidth
+      if (!rect) return
 
-        const zoomRatio = newZoomLevel / zoomLevel
-        const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
+      const scale = distance / lastTouchDistance
+      const newZoomLevel = Math.min(Math.max(zoomLevel * scale, 0.5), 5)
 
-        setZoomLevel(newZoomLevel)
-        setPanOffset(newPanOffset)
-      }
-    } else if (event.touches.length === 1 && isDragging) {
+      // Calculate pan offset to keep zoom centered on pinch center
+      const centerX = center.x - rect.left
+      const containerWidth = rect.width
+      const zoomPoint = centerX / containerWidth
+
+      const zoomRatio = newZoomLevel / zoomLevel
+      const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
+
+      setZoomLevel(newZoomLevel)
+      setPanOffset(newPanOffset)
+      setLastTouchDistance(distance)
+    } else if (event.touches.length === 1 && isDragging && !isZooming) {
       // Single finger drag
       const deltaX = event.touches[0].clientX - dragStart.x
       const newPanOffset = dragStart.panOffset + deltaX
@@ -497,16 +502,17 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     if (!isFullscreen) return
 
     event.preventDefault()
+    event.stopPropagation()
 
     if (event.touches.length === 0) {
       // All fingers lifted
       setLastTouchDistance(0)
       setIsDragging(false)
-      setInitialPinchData(null)
-    } else if (event.touches.length === 1) {
-      // One finger remaining, switch to drag mode
+      setIsZooming(false)
+    } else if (event.touches.length === 1 && isZooming) {
+      // One finger remaining after pinch, switch to drag mode
       setLastTouchDistance(0)
-      setInitialPinchData(null)
+      setIsZooming(false)
       setIsDragging(true)
       setDragStart({ x: event.touches[0].clientX, panOffset })
     }
@@ -526,10 +532,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
 
     const chartHeight = isFullscreenMode ? window.innerHeight - 200 : 300
     const containerRef = isFullscreenMode ? fullscreenRef : chartRef
-    const containerWidth = containerRef.current?.clientWidth || 600
 
     // Always use full container width, ensure minimum width and account for padding
-    const baseChartWidth = Math.max(containerWidth - 32, 300) // Account for padding and ensure minimum
+    const baseChartWidth = Math.max(containerWidth - (isFullscreenMode ? 80 : 64), 300)
     const chartWidth = isFullscreenMode ? baseChartWidth * zoomLevel : baseChartWidth
 
     const isShortRange = timeRange === "1H" || timeRange === "24H"
@@ -537,19 +542,19 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     // Create SVG path for the price line
     const pathData = validData
       .map((point, index) => {
-        const x = (index / (validData.length - 1)) * chartWidth
+        const x = (index / (validData.length - 1)) * baseChartWidth
         const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
         return `${index === 0 ? "M" : "L"} ${x} ${y}`
       })
       .join(" ")
 
     // Create area path for gradient fill
-    const areaData = `${pathData} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`
+    const areaData = `${pathData} L ${baseChartWidth} ${chartHeight} L 0 ${chartHeight} Z`
 
     // Calculate transform
     let currentTransform = "none"
-    if (isFullscreenMode && zoomLevel > 1) {
-      currentTransform = `translateX(${panOffset}px)`
+    if (isFullscreenMode && zoomLevel !== 1) {
+      currentTransform = `translateX(${panOffset}px) scaleX(${zoomLevel})`
     }
 
     return (
@@ -578,21 +583,22 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         <div
           className="h-full w-full"
           style={{
-            width: `${chartWidth}px`,
+            width: `${baseChartWidth}px`,
             transform: currentTransform,
-            minWidth: "100%",
+            transformOrigin: "left center",
           }}
         >
           <svg
-            width="100%"
-            height="100%"
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+            width={baseChartWidth}
+            height={chartHeight}
+            viewBox={`0 0 ${baseChartWidth} ${chartHeight}`}
             className="overflow-visible"
             preserveAspectRatio="none"
             style={{
               userSelect: "none",
               WebkitUserSelect: "none",
-              pointerEvents: isFullscreenMode ? "auto" : "none",
+              width: "100%",
+              height: "100%",
             }}
           >
             <defs>
@@ -615,7 +621,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 key={ratio}
                 x1="0"
                 y1={chartHeight * ratio}
-                x2={chartWidth}
+                x2={baseChartWidth}
                 y2={chartHeight * ratio}
                 stroke="rgba(255,255,255,0.1)"
                 strokeDasharray="2,2"
@@ -637,7 +643,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
 
             {/* Data points */}
             {validData.map((point, index) => {
-              const x = (index / (validData.length - 1)) * chartWidth
+              const x = (index / (validData.length - 1)) * baseChartWidth
               const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
               return (
                 <circle
@@ -649,10 +655,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                   stroke="rgba(0,0,0,0.8)"
                   strokeWidth="2"
                   className="opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
-                  onClick={(e) => handleChartClick(e, point)}
-                  onMouseEnter={(e) => isFullscreenMode && handleChartHover(e, point)}
-                  onMouseLeave={() => isFullscreenMode && closeTooltip()}
-                  style={{ pointerEvents: isFullscreenMode ? "auto" : "none" }}
+                  onClick={(e) => !isFullscreenMode && handleChartClick(e, point)}
+                  onMouseEnter={(e) => !isFullscreenMode && handleChartHover(e, point)}
+                  onMouseLeave={() => !isFullscreenMode && closeTooltip()}
                 />
               )
             })}
@@ -667,23 +672,23 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               isFullscreenMode
                 ? {
                     position: "fixed",
-                    left: window.innerWidth < 640 ? "0.5rem" : "1rem",
+                    left: "0.5rem",
                     top: "50%",
                     transform: "translateY(-50%)",
                     height: `${chartHeight}px`,
                     zIndex: 10,
-                    backgroundColor: isFullscreenMode ? "rgba(0,0,0,0.8)" : "transparent",
+                    backgroundColor: "rgba(0,0,0,0.8)",
                     borderRadius: "0.25rem",
                     padding: "0.25rem",
                   }
                 : {}
             }
           >
-            <span className="text-xs sm:text-sm">{formatCurrency(maxPrice + padding)}</span>
-            <span className="text-xs sm:text-sm">{formatCurrency(maxPrice * 0.75 + minPrice * 0.25)}</span>
-            <span className="text-xs sm:text-sm">{formatCurrency((maxPrice + minPrice) / 2)}</span>
-            <span className="text-xs sm:text-sm">{formatCurrency(maxPrice * 0.25 + minPrice * 0.75)}</span>
-            <span className="text-xs sm:text-sm">{formatCurrency(minPrice - padding)}</span>
+            <span className="text-xs">{formatCurrency(maxPrice + padding)}</span>
+            <span className="text-xs">{formatCurrency(maxPrice * 0.75 + minPrice * 0.25)}</span>
+            <span className="text-xs">{formatCurrency((maxPrice + minPrice) / 2)}</span>
+            <span className="text-xs">{formatCurrency(maxPrice * 0.25 + minPrice * 0.75)}</span>
+            <span className="text-xs">{formatCurrency(minPrice - padding)}</span>
           </div>
 
           {/* X-axis labels */}
@@ -710,7 +715,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               style={{
                 left: tooltip.x + 10,
                 top: tooltip.y - 10,
-                transform: tooltip.x > chartWidth / 2 ? "translateX(-100%)" : "none",
+                transform: tooltip.x > baseChartWidth / 2 ? "translateX(-100%)" : "none",
               }}
             >
               <button
