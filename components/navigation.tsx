@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
@@ -124,6 +123,13 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
+                onClick={() => router.push("/tokens")}
+                className="text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
+              >
+                <span className="relative z-10">Tokens</span>
+              </Button>
+              <Button
+                variant="ghost"
                 onClick={() => router.push("/dapps")}
                 className="text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
               >
@@ -212,6 +218,13 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
             className="md:hidden border-t border-white/10 py-4"
           >
             <div className="space-y-4">
+              <Button
+                variant="ghost"
+                onClick={() => router.push("/tokens")}
+                className="w-full justify-start text-white/70 hover:text-white font-orbitron relative bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
+              >
+                <span className="relative z-10">Tokens</span>
+              </Button>
               <Button
                 variant="ghost"
                 onClick={() => router.push("/dapps")}
