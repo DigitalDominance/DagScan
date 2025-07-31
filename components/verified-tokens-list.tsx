@@ -98,35 +98,61 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     return Math.random() * 1000000000
   }
 
-  // Simplified 24hr change calculation with timeout
-  const calculate24hrChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
+  // Get 24hr change from chart data - this will be consistent with the chart
+  const getChartPriceChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
     try {
-      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
 
-      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 1440, 0)
+      // Use the same data source as the chart - get price history for 24 hours
+      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 2880, 0) // 2 days worth to ensure coverage
       const priceHistory = await Promise.race([priceHistoryPromise, timeoutPromise])
 
       if (!priceHistory || priceHistory.length === 0) {
         return Math.random() * 20 - 10
       }
 
-      const sortedHistory = priceHistory
-        .filter((p) => p.priceUSD && !isNaN(p.priceUSD) && p.priceUSD > 0)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      const now = new Date()
 
-      if (sortedHistory.length === 0) {
+      // Sort all prices by timestamp first to get chronological order (same as chart)
+      priceHistory.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+      // Filter to get only valid prices from the past (same as chart)
+      const validPrices = priceHistory.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        const isValidPrice = typeof price.priceUSD === "number" && !isNaN(price.priceUSD) && price.priceUSD > 0
+        const isNotFuture = priceDate <= now
+        return isValidPrice && isNotFuture
+      })
+
+      if (validPrices.length === 0) {
         return Math.random() * 20 - 10
       }
 
-      const price24hAgo = sortedHistory[0].priceUSD
+      // Get data from the most recent time backwards for 24H (same as chart)
+      const mostRecentTime = new Date(validPrices[validPrices.length - 1].timestamp)
+      const startTime = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000)
 
-      if (price24hAgo && price24hAgo > 0 && currentPrice > 0) {
-        return ((currentPrice - price24hAgo) / price24hAgo) * 100
+      const filteredPrices = validPrices.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        return priceDate >= startTime
+      })
+
+      // If no data in the specific time range, get the most recent available data
+      const finalPrices =
+        filteredPrices.length === 0 ? validPrices.slice(-Math.min(100, validPrices.length)) : filteredPrices
+
+      // Calculate price change using first and last data points (EXACT same as chart)
+      if (finalPrices.length > 1) {
+        const oldPrice = finalPrices[0].priceUSD || 0
+        const newPrice = finalPrices[finalPrices.length - 1].priceUSD || 0
+        if (oldPrice > 0) {
+          return ((newPrice - oldPrice) / oldPrice) * 100
+        }
       }
 
       return Math.random() * 20 - 10
     } catch (error) {
-      console.warn(`Failed to calculate 24hr change for ${tokenAddress}:`, error)
+      console.warn(`Failed to calculate chart-consistent 24hr change for ${tokenAddress}:`, error)
       return Math.random() * 20 - 10
     }
   }
@@ -211,7 +237,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
 
                 // Calculate accurate 24hr price change and volume
                 const [priceChange24h, volume24h] = await Promise.all([
-                  calculate24hrChange(token.address, currentPrice),
+                  getChartPriceChange(token.address, currentPrice), // Use chart-consistent calculation
                   calculate24hrVolume(token.address),
                 ])
 
