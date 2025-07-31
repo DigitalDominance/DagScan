@@ -26,7 +26,7 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
-  const [sortBy, setSortBy] = useState<"tvl" | "volume" | "apy">("tvl")
+  const [sortBy, setSortBy] = useState<"tvl" | "volume" | "apr">("tvl")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
   const [tokenLogos, setTokenLogos] = useState<Record<string, string>>({})
 
@@ -124,7 +124,7 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
     fetchPools()
   }, [currentPage, sortBy, sortOrder, poolsPerPage])
 
-  const handleSort = (column: "tvl" | "volume" | "apy") => {
+  const handleSort = (column: "tvl" | "volume" | "apr") => {
     if (sortBy === column) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc")
     } else {
@@ -134,7 +134,7 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
     setCurrentPage(1) // Reset to first page when sorting
   }
 
-  const getSortIcon = (column: "tvl" | "volume" | "apy") => {
+  const getSortIcon = (column: "tvl" | "volume" | "apr") => {
     if (sortBy !== column) {
       return <ArrowUpDown className="h-4 w-4" />
     }
@@ -220,10 +220,10 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
             </div>
             <div className="col-span-2">
               <button
-                onClick={() => handleSort("apy")}
+                onClick={() => handleSort("apr")}
                 className="flex items-center gap-1 hover:text-white transition-colors"
               >
-                APY {getSortIcon("apy")}
+                APR {getSortIcon("apr")}
               </button>
             </div>
             <div className="col-span-2">Status</div>
@@ -282,10 +282,10 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
                 <div className="text-white font-orbitron">{formatCurrency(pool.volumeUSD)}</div>
               </div>
 
-              {/* APY */}
+              {/* apr */}
               <div className="col-span-1 md:col-span-2">
-                <div className="md:hidden text-white/50 text-xs font-rajdhani mb-1">APY</div>
-                <div className="text-purple-400 font-orbitron">{formatPercent(pool.apy)}</div>
+                <div className="md:hidden text-white/50 text-xs font-rajdhani mb-1">APR</div>
+                <div className="text-purple-400 font-orbitron">{formatPercent(pool.apr)}</div>
               </div>
 
               {/* Status */}
