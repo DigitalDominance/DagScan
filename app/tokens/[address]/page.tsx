@@ -120,29 +120,50 @@ export default function TokenPage() {
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
 
       // Use the same data source as the chart - get price history for 24 hours
-      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 1440, 0) // 1440 minutes = 24 hours
+      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 2880, 0) // 2 days worth to ensure coverage
       const priceHistory = await Promise.race([priceHistoryPromise, timeoutPromise])
 
       if (!priceHistory || priceHistory.length === 0) {
         return Math.random() * 20 - 10
       }
 
-      // Sort by timestamp to get chronological order
-      const sortedHistory = priceHistory
-        .filter((p) => p.priceUSD && !isNaN(p.priceUSD) && p.priceUSD > 0)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      const now = new Date()
 
-      if (sortedHistory.length === 0) {
+      // Sort all prices by timestamp first to get chronological order (same as chart)
+      priceHistory.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+      // Filter to get only valid prices from the past (same as chart)
+      const validPrices = priceHistory.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        const isValidPrice = typeof price.priceUSD === "number" && !isNaN(price.priceUSD) && price.priceUSD > 0
+        const isNotFuture = priceDate <= now
+        return isValidPrice && isNotFuture
+      })
+
+      if (validPrices.length === 0) {
         return Math.random() * 20 - 10
       }
 
-      // Get the earliest price (24h ago) and latest price
-      const price24hAgo = sortedHistory[0].priceUSD
-      const latestPrice = sortedHistory[sortedHistory.length - 1].priceUSD || currentPrice
+      // Get data from the most recent time backwards for 24H (same as chart)
+      const mostRecentTime = new Date(validPrices[validPrices.length - 1].timestamp)
+      const startTime = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000)
 
-      if (price24hAgo && price24hAgo > 0 && latestPrice > 0) {
-        const change = ((latestPrice - price24hAgo) / price24hAgo) * 100
-        return change
+      const filteredPrices = validPrices.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        return priceDate >= startTime
+      })
+
+      // If no data in the specific time range, get the most recent available data
+      const finalPrices =
+        filteredPrices.length === 0 ? validPrices.slice(-Math.min(100, validPrices.length)) : filteredPrices
+
+      // Calculate price change using first and last data points (EXACT same as chart)
+      if (finalPrices.length > 1) {
+        const oldPrice = finalPrices[0].priceUSD || 0
+        const newPrice = finalPrices[finalPrices.length - 1].priceUSD || 0
+        if (oldPrice > 0) {
+          return ((newPrice - oldPrice) / oldPrice) * 100
+        }
       }
 
       return Math.random() * 20 - 10
