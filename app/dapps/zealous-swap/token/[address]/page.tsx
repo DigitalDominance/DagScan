@@ -331,9 +331,8 @@ export default function TokenPage() {
             <Button
               variant="ghost"
               onClick={() => router.push("/dapps/zealous-swap")}
-              className="text-white/70 hover:text-white mb-4 relative overflow-hidden group"
+              className="text-white mb-4 relative overflow-hidden group bg-black/40 backdrop-blur-sm hover:bg-black/60 transition-all duration-300 border border-transparent hover:shadow-[0_0_20px_rgba(59,130,246,0.3),0_0_40px_rgba(147,51,234,0.2),0_0_60px_rgba(236,72,153,0.1)] before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-blue-500 before:via-purple-500 before:to-pink-500 before:-z-10 before:opacity-0 hover:before:opacity-100"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-purple-900/50 via-pink-900/50 to-blue-900/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-md"></div>
               <div className="relative flex items-center">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Zealous Swap
