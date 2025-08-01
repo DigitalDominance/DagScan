@@ -18,6 +18,15 @@ import {
   Play,
   Pause,
   Volume2,
+  Users,
+  Coins,
+  FileText,
+  Eye,
+  EyeOff,
+  Globe,
+  Twitter,
+  Github,
+  MessageCircle,
 } from "lucide-react"
 import { KasplexAPI } from "@/lib/api"
 import BeamsBackground from "@/components/beams-background"
@@ -41,6 +50,11 @@ export default function AddressPage() {
     type: "video" | "audio" | "image"
     url: string
   } | null>(null)
+  const [contractCode, setContractCode] = useState<string | null>(null)
+  const [contractMetadata, setContractMetadata] = useState<any>(null)
+  const [tokenHolders, setTokenHolders] = useState<any[]>([])
+  const [contractNFTs, setContractNFTs] = useState<any[]>([])
+  const [showContractCode, setShowContractCode] = useState(false)
 
   const transactionsPerPage = 10
   const address = params.address as string
@@ -59,8 +73,38 @@ export default function AddressPage() {
           return tokenName !== "Unknown Token"
         })
         setTokenBalances(filteredTokens)
-
         setNfts(data.nfts || [])
+
+        // If it's a contract, fetch additional contract data
+        if (data.contractInfo?.isContract) {
+          try {
+            // Fetch contract code
+            const codeData = await api.getContractCode(address)
+            setContractCode(codeData?.code || null)
+
+            // Fetch contract metadata (token info, NFT collection info, etc.)
+            const metadataData = await api.getContractMetadata(address)
+            setContractMetadata(metadataData)
+
+            // If it's a token contract, fetch holder information
+            if (data.contractInfo.contractType === "ERC20" || data.contractInfo.contractType === "Token") {
+              const holdersData = await api.getTokenHolders(address)
+              setTokenHolders(holdersData?.holders || [])
+            }
+
+            // If it's an NFT contract, fetch collection NFTs
+            if (
+              data.contractInfo.contractType === "ERC721" ||
+              data.contractInfo.contractType === "ERC1155" ||
+              data.contractInfo.contractType === "NFT"
+            ) {
+              const nftData = await api.getContractNFTs(address)
+              setContractNFTs(nftData?.nfts || [])
+            }
+          } catch (contractErr) {
+            console.error("Failed to fetch contract details:", contractErr)
+          }
+        }
       } catch (err) {
         setError("Failed to load address data")
         console.error(err)
@@ -197,6 +241,34 @@ export default function AddressPage() {
     setCurrentPage(Math.max(1, Math.min(page, totalPages)))
   }
 
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) {
+      return `${(num / 1000000).toFixed(2)}M`
+    } else if (num >= 1000) {
+      return `${(num / 1000).toFixed(2)}K`
+    }
+    return num.toString()
+  }
+
+  const formatTokenSupply = (supply: string, decimals: number) => {
+    const supplyNum = Number.parseFloat(supply) / Math.pow(10, decimals)
+    return formatNumber(supplyNum)
+  }
+
+  const getContractTypeIcon = (type: string) => {
+    switch (type?.toLowerCase()) {
+      case "erc20":
+      case "token":
+        return <Coins className="h-4 w-4" />
+      case "erc721":
+      case "erc1155":
+      case "nft":
+        return <FileText className="h-4 w-4" />
+      default:
+        return <Code className="h-4 w-4" />
+    }
+  }
+
   if (loading) {
     return (
       <BeamsBackground>
@@ -266,43 +338,44 @@ export default function AddressPage() {
           </div>
 
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
-            {/* Contract Info */}
+            {/* Enhanced Contract Info */}
             {addressData.contractInfo?.isContract && (
-              <Card className="bg-blue-500/10 border-blue-500/20 backdrop-blur-xl mb-4 sm:mb-6">
-                <CardHeader className="p-3 sm:p-6">
-                  <CardTitle className="text-blue-300 font-inter flex items-center gap-2 text-sm sm:text-base">
-                    <Code className="h-4 w-4 sm:h-5 sm:w-5" />
-                    Contract Information
-                    {addressData.contractInfo.isVerified && (
-                      <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs">
-                        <Shield className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
-                        Verified
-                      </Badge>
-                    )}
-                  </CardTitle>
-                </CardHeader>
-                {addressData.contractInfo.name && (
+              <div className="space-y-4 sm:space-y-6">
+                {/* Main Contract Information */}
+                <Card className="bg-blue-500/10 border-blue-500/20 backdrop-blur-xl">
+                  <CardHeader className="p-3 sm:p-6">
+                    <CardTitle className="text-blue-300 font-inter flex items-center gap-2 text-sm sm:text-base">
+                      <Code className="h-4 w-4 sm:h-5 sm:w-5" />
+                      Smart Contract
+                      {addressData.contractInfo.isVerified && (
+                        <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs">
+                          <Shield className="h-2 w-2 sm:h-3 sm:w-3 mr-1" />
+                          Verified
+                        </Badge>
+                      )}
+                      {addressData.contractInfo.contractType && (
+                        <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs flex items-center gap-1">
+                          {getContractTypeIcon(addressData.contractInfo.contractType)}
+                          {addressData.contractInfo.contractType}
+                        </Badge>
+                      )}
+                    </CardTitle>
+                  </CardHeader>
                   <CardContent className="p-3 sm:p-6 pt-0">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                      <div>
-                        <label className="text-xs sm:text-sm text-white/70 font-inter">Contract Name</label>
-                        <div className="text-white font-inter mt-1 text-sm sm:text-base">
-                          {addressData.contractInfo.name}
-                        </div>
-                      </div>
-                      {addressData.contractInfo.symbol && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                      {addressData.contractInfo.name && (
                         <div>
-                          <label className="text-xs sm:text-sm text-white/70 font-inter">Symbol</label>
-                          <div className="text-white font-inter mt-1 text-sm sm:text-base">
-                            {addressData.contractInfo.symbol}
+                          <label className="text-xs sm:text-sm text-white/70 font-inter">Contract Name</label>
+                          <div className="text-white font-inter mt-1 text-sm sm:text-base font-medium">
+                            {addressData.contractInfo.name}
                           </div>
                         </div>
                       )}
-                      {addressData.contractInfo.contractType && (
+                      {addressData.contractInfo.symbol && (
                         <div>
-                          <label className="text-xs sm:text-sm text-white/70 font-inter">Type</label>
-                          <div className="text-white font-inter mt-1 text-sm sm:text-base">
-                            {addressData.contractInfo.contractType}
+                          <label className="text-xs sm:text-sm text-white/70 font-inter">Symbol</label>
+                          <div className="text-white font-inter mt-1 text-sm sm:text-base font-medium">
+                            {addressData.contractInfo.symbol}
                           </div>
                         </div>
                       )}
@@ -314,10 +387,254 @@ export default function AddressPage() {
                           </div>
                         </div>
                       )}
+                      {contractMetadata?.totalSupply && (
+                        <div>
+                          <label className="text-xs sm:text-sm text-white/70 font-inter">Total Supply</label>
+                          <div className="text-white font-inter mt-1 text-sm sm:text-base">
+                            {addressData.contractInfo.decimals
+                              ? formatTokenSupply(contractMetadata.totalSupply, addressData.contractInfo.decimals)
+                              : formatNumber(Number.parseFloat(contractMetadata.totalSupply))}
+                          </div>
+                        </div>
+                      )}
+                      {contractMetadata?.createdAt && (
+                        <div>
+                          <label className="text-xs sm:text-sm text-white/70 font-inter">Created</label>
+                          <div className="text-white font-inter mt-1 text-sm sm:text-base">
+                            {new Date(contractMetadata.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                      )}
+                      {tokenHolders.length > 0 && (
+                        <div>
+                          <label className="text-xs sm:text-sm text-white/70 font-inter">Holders</label>
+                          <div className="text-white font-inter mt-1 text-sm sm:text-base">
+                            {formatNumber(tokenHolders.length)}
+                          </div>
+                        </div>
+                      )}
                     </div>
+
+                    {/* Contract Description */}
+                    {contractMetadata?.description && (
+                      <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-blue-500/20">
+                        <label className="text-xs sm:text-sm text-white/70 font-inter">Description</label>
+                        <div className="text-white/90 font-inter mt-2 text-sm leading-relaxed">
+                          {contractMetadata.description}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Social Links */}
+                    {(contractMetadata?.website ||
+                      contractMetadata?.twitter ||
+                      contractMetadata?.github ||
+                      contractMetadata?.discord) && (
+                      <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-blue-500/20">
+                        <label className="text-xs sm:text-sm text-white/70 font-inter mb-3 block">Links</label>
+                        <div className="flex flex-wrap gap-2">
+                          {contractMetadata.website && (
+                            <a
+                              href={contractMetadata.website}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs hover:bg-blue-500/30 transition-colors"
+                            >
+                              <Globe className="h-3 w-3" />
+                              Website
+                            </a>
+                          )}
+                          {contractMetadata.twitter && (
+                            <a
+                              href={contractMetadata.twitter}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs hover:bg-blue-500/30 transition-colors"
+                            >
+                              <Twitter className="h-3 w-3" />
+                              Twitter
+                            </a>
+                          )}
+                          {contractMetadata.github && (
+                            <a
+                              href={contractMetadata.github}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs hover:bg-blue-500/30 transition-colors"
+                            >
+                              <Github className="h-3 w-3" />
+                              GitHub
+                            </a>
+                          )}
+                          {contractMetadata.discord && (
+                            <a
+                              href={contractMetadata.discord}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 px-3 py-1 bg-blue-500/20 text-blue-300 rounded-full text-xs hover:bg-blue-500/30 transition-colors"
+                            >
+                              <MessageCircle className="h-3 w-3" />
+                              Discord
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
+                </Card>
+
+                {/* Token Holders Section */}
+                {tokenHolders.length > 0 && (
+                  <Card className="bg-green-500/10 border-green-500/20 backdrop-blur-xl">
+                    <CardHeader className="p-3 sm:p-6">
+                      <CardTitle className="text-green-300 font-inter flex items-center gap-2 text-sm sm:text-base">
+                        <Users className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Top Token Holders ({tokenHolders.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-6 pt-0">
+                      <div className="space-y-2 sm:space-y-3">
+                        {tokenHolders.slice(0, 10).map((holder: any, index: number) => (
+                          <div
+                            key={index}
+                            className="flex items-center justify-between p-2 sm:p-3 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
+                            onClick={() => router.push(`/address/${holder.address}`)}
+                          >
+                            <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                              <div className="text-xs text-white/50 font-mono w-6 text-center">#{index + 1}</div>
+                              <code className="text-white/80 font-mono text-xs sm:text-sm truncate">
+                                {formatHash(holder.address)}
+                              </code>
+                            </div>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-white text-xs sm:text-sm">
+                                {holder.balance && addressData.contractInfo.decimals
+                                  ? formatTokenSupply(holder.balance, addressData.contractInfo.decimals)
+                                  : formatNumber(Number.parseFloat(holder.balance || "0"))}
+                              </div>
+                              <div className="text-xs text-white/50">
+                                {holder.percentage ? `${holder.percentage.toFixed(2)}%` : ""}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                      {tokenHolders.length > 10 && (
+                        <div className="text-center mt-3 sm:mt-4 text-white/50 text-xs sm:text-sm">
+                          And {tokenHolders.length - 10} more holders...
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
                 )}
-              </Card>
+
+                {/* Contract NFTs Section */}
+                {contractNFTs.length > 0 && (
+                  <Card className="bg-purple-500/10 border-purple-500/20 backdrop-blur-xl">
+                    <CardHeader className="p-3 sm:p-6">
+                      <CardTitle className="text-purple-300 font-inter flex items-center gap-2 text-sm sm:text-base">
+                        <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                        Collection NFTs ({contractNFTs.length})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-3 sm:p-6 pt-0">
+                      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-2 sm:gap-3">
+                        {contractNFTs.slice(0, 12).map((nft: any, index: number) => {
+                          const mediaUrl = getMediaUrl(nft)
+                          const displayImage = getDisplayImage(nft)
+
+                          return (
+                            <div
+                              key={index}
+                              className="bg-white/5 rounded-lg p-2 hover:bg-white/10 transition-colors group cursor-pointer"
+                              onClick={() => router.push(`/address/${nft.owner}`)}
+                            >
+                              <div className="aspect-square mb-2 bg-white/5 rounded-lg overflow-hidden">
+                                <img
+                                  src={displayImage || "/placeholder.svg?height=100&width=100&text=NFT"}
+                                  alt={nft.metadata?.name || `NFT #${nft.id}`}
+                                  className="w-full h-full object-cover"
+                                  onError={(e) => {
+                                    e.currentTarget.src = "/placeholder.svg?height=100&width=100&text=NFT"
+                                  }}
+                                />
+                              </div>
+                              <div className="space-y-1">
+                                <h3 className="text-white font-medium text-xs truncate">
+                                  {nft.metadata?.name || `#${nft.id}`}
+                                </h3>
+                                <div className="text-xs text-white/50 truncate">Owner: {formatHash(nft.owner)}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                      {contractNFTs.length > 12 && (
+                        <div className="text-center mt-3 sm:mt-4 text-white/50 text-xs sm:text-sm">
+                          And {contractNFTs.length - 12} more NFTs...
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Contract Code Section */}
+                {contractCode && (
+                  <Card className="bg-gray-500/10 border-gray-500/20 backdrop-blur-xl">
+                    <CardHeader className="p-3 sm:p-6">
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-gray-300 font-inter flex items-center gap-2 text-sm sm:text-base">
+                          <Code className="h-4 w-4 sm:h-5 sm:w-5" />
+                          Contract Code
+                        </CardTitle>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowContractCode(!showContractCode)}
+                          className="text-gray-300 hover:text-white text-xs"
+                        >
+                          {showContractCode ? (
+                            <>
+                              <EyeOff className="h-3 w-3 mr-1" />
+                              Hide
+                            </>
+                          ) : (
+                            <>
+                              <Eye className="h-3 w-3 mr-1" />
+                              Show
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    {showContractCode && (
+                      <CardContent className="p-3 sm:p-6 pt-0">
+                        <div className="bg-black/50 rounded-lg p-3 sm:p-4 max-h-96 overflow-auto">
+                          <pre className="text-xs text-white/80 font-mono whitespace-pre-wrap break-all">
+                            {contractCode}
+                          </pre>
+                        </div>
+                        <div className="flex items-center justify-between mt-3">
+                          <span className="text-xs text-white/50">{contractCode.length} characters</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => copyToClipboard(contractCode)}
+                            className="text-white/50 hover:text-white text-xs"
+                          >
+                            {copiedText === contractCode ? (
+                              <CheckCircle className="h-3 w-3 mr-1 text-green-400" />
+                            ) : (
+                              <Copy className="h-3 w-3 mr-1" />
+                            )}
+                            Copy Code
+                          </Button>
+                        </div>
+                      </CardContent>
+                    )}
+                  </Card>
+                )}
+              </div>
             )}
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl mb-4 sm:mb-8">
