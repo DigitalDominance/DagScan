@@ -92,6 +92,7 @@ class KasplexAPI {
   private chainId: number
   private currentRpcIndex = 0
   private useMockData = false
+  private baseApiUrl = "https://frontend.kasplextest.xyz/api/v2"
 
   constructor(network: "kasplex" | "igra") {
     if (network === "kasplex") {
@@ -566,7 +567,7 @@ class KasplexAPI {
 
     try {
       // Use the official Kasplex frontend API
-      const apiUrl = `https://frontend.kasplextest.xyz/api/v2/addresses/${address}/transactions`
+      const apiUrl = `${this.baseApiUrl}/addresses/${address}/transactions`
 
       console.log(`📡 Fetching from: ${apiUrl}`)
 
@@ -723,7 +724,7 @@ class KasplexAPI {
   // NEW: Get token balances for an address
   async getAddressTokenBalances(address: string): Promise<any[]> {
     try {
-      const apiUrl = `https://frontend.kasplextest.xyz/api/v2/addresses/${address}/token-balances`
+      const apiUrl = `${this.baseApiUrl}/addresses/${address}/token-balances`
 
       const response = await fetch(apiUrl, {
         method: "GET",
@@ -765,7 +766,7 @@ class KasplexAPI {
   // NEW: Get token transfers for an address
   async getAddressTokenTransfers(address: string, limit = 50): Promise<any[]> {
     try {
-      const apiUrl = `https://frontend.kasplextest.xyz/api/v2/addresses/${address}/token-transfers`
+      const apiUrl = `${this.baseApiUrl}/addresses/${address}/token-transfers`
 
       const response = await fetch(apiUrl, {
         method: "GET",
@@ -805,7 +806,7 @@ class KasplexAPI {
   // NEW: Get NFTs for an address
   async getAddressNFTs(address: string, limit = 50): Promise<any[]> {
     try {
-      const apiUrl = `https://frontend.kasplextest.xyz/api/v2/addresses/${address}/nft`
+      const apiUrl = `${this.baseApiUrl}/addresses/${address}/nft`
 
       const response = await fetch(apiUrl, {
         method: "GET",
@@ -1049,6 +1050,248 @@ class KasplexAPI {
     } catch (error) {
       console.error("Failed to get transaction details:", error)
       throw error
+    }
+  }
+
+  // NEW: Get smart contract details using the new API endpoints
+  async getSmartContractDetails(address: string): Promise<any> {
+    try {
+      const apiUrl = `${this.baseApiUrl}/smart-contracts/${address}`
+
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Smart contract API failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error("Failed to get smart contract details:", error)
+      return null
+    }
+  }
+
+  // NEW: Get token info using the new API endpoints
+  async getTokenInfo(address: string): Promise<any> {
+    try {
+      const apiUrl = `${this.baseApiUrl}/tokens/${address}`
+
+      const response = await fetch(apiUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Token info API failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+      return data
+    } catch (error) {
+      console.error("Failed to get token info:", error)
+      return null
+    }
+  }
+
+  // NEW: Get contract source code
+  async getContractCode(address: string): Promise<{ code: string } | null> {
+    try {
+      // First try to get smart contract details which includes source code
+      const contractDetails = await this.getSmartContractDetails(address)
+
+      if (contractDetails?.source_code) {
+        return { code: contractDetails.source_code }
+      }
+
+      // Fallback to RPC call for bytecode
+      const code = await this.rpcCall<string>("eth_getCode", [address, "latest"])
+
+      if (code && code !== "0x" && code.length > 2) {
+        return { code }
+      }
+
+      return null
+    } catch (error) {
+      console.error("Failed to get contract code:", error)
+      return null
+    }
+  }
+
+  // NEW: Get contract metadata (token info, etc.)
+  async getContractMetadata(address: string): Promise<any> {
+    try {
+      // Try to get both smart contract details and token info
+      const [contractDetails, tokenInfo] = await Promise.all([
+        this.getSmartContractDetails(address),
+        this.getTokenInfo(address),
+      ])
+
+      return {
+        // Smart contract specific data
+        isVerified: contractDetails?.is_verified || false,
+        isFullyVerified: contractDetails?.is_fully_verified || false,
+        compilerVersion: contractDetails?.compiler_version,
+        language: contractDetails?.language,
+        optimizationEnabled: contractDetails?.optimization_enabled,
+        verifiedAt: contractDetails?.verified_at,
+        abi: contractDetails?.abi,
+        constructorArgs: contractDetails?.constructor_args,
+
+        // Token specific data
+        totalSupply: tokenInfo?.total_supply,
+        decimals: tokenInfo?.decimals,
+        holders: tokenInfo?.holders,
+        exchangeRate: tokenInfo?.exchange_rate,
+        circulatingMarketCap: tokenInfo?.circulating_market_cap,
+        iconUrl: tokenInfo?.icon_url,
+
+        // Combined metadata
+        name: contractDetails?.name || tokenInfo?.name,
+        symbol: tokenInfo?.symbol,
+        type: tokenInfo?.type,
+
+        // Additional contract info
+        createdAt: contractDetails?.verified_at,
+        ...contractDetails,
+        ...tokenInfo,
+      }
+    } catch (error) {
+      console.error("Failed to get contract metadata:", error)
+      return {}
+    }
+  }
+
+  // NEW: Get token holders for a contract
+  async getTokenHolders(address: string, limit = 50): Promise<{ holders: any[] }> {
+    try {
+      const holdersUrl = `${this.baseApiUrl}/tokens/${address}/holders`
+
+      const response = await fetch(holdersUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Token holders API failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.items && Array.isArray(data.items)) {
+        const holders = data.items.slice(0, limit).map((holder: any, index: number) => ({
+          address: holder.address?.hash || holder.address,
+          balance: holder.value,
+          tokenId: holder.token_id,
+          percentage: (Number.parseFloat(holder.value || "0") / Number.parseFloat(data.total_supply || "1")) * 100,
+        }))
+
+        return { holders }
+      }
+
+      return { holders: [] }
+    } catch (error) {
+      console.error("Failed to get token holders:", error)
+      return { holders: [] }
+    }
+  }
+
+  // NEW: Get NFTs from a contract collection
+  async getContractNFTs(address: string, limit = 50): Promise<{ nfts: any[] }> {
+    try {
+      const nftsUrl = `${this.baseApiUrl}/tokens/${address}/instances`
+
+      const response = await fetch(nftsUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Contract NFTs API failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.items && Array.isArray(data.items)) {
+        const nfts = data.items.slice(0, limit).map((nft: any) => ({
+          id: nft.id,
+          owner: nft.owner?.hash || nft.holder_address_hash,
+          metadata: nft.metadata,
+          image_url: nft.image_url || nft.metadata?.image_url,
+          animation_url: nft.animation_url,
+          token_type: nft.token_type || "ERC721",
+          isUnique: nft.is_unique,
+          externalAppUrl: nft.external_app_url,
+        }))
+
+        return { nfts }
+      }
+
+      return { nfts: [] }
+    } catch (error) {
+      console.error("Failed to get contract NFTs:", error)
+      return { nfts: [] }
+    }
+  }
+
+  // NEW: Get token transfers for a contract
+  async getTokenTransfers(address: string, limit = 50): Promise<any[]> {
+    try {
+      const transfersUrl = `${this.baseApiUrl}/tokens/${address}/transfers`
+
+      const response = await fetch(transfersUrl, {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        signal: AbortSignal.timeout(10000),
+      })
+
+      if (!response.ok) {
+        throw new Error(`Token transfers API failed: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      if (data.items && Array.isArray(data.items)) {
+        return data.items.slice(0, limit).map((transfer: any) => ({
+          blockHash: transfer.block_hash,
+          from: transfer.from?.hash,
+          to: transfer.to?.hash,
+          logIndex: transfer.log_index,
+          method: transfer.method,
+          timestamp: transfer.timestamp,
+          token: transfer.token,
+          total: transfer.total,
+          transactionHash: transfer.transaction_hash,
+          type: transfer.type,
+        }))
+      }
+
+      return []
+    } catch (error) {
+      console.error("Failed to get token transfers:", error)
+      return []
     }
   }
 
