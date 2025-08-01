@@ -142,29 +142,53 @@ export default function TokenPage() {
   }
 
   // Calculate accurate 24hr price change from historical data
-  const calculate24hrChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
+  const getChartPriceChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
     try {
-      // Get price data from 24 hours ago
-      const priceHistory = await zealousAPI.getTokenPrice(tokenAddress, 1440, 0) // 24 hours of minute data
+      const now = new Date()
+      // Get 2 days worth of data to ensure coverage
+      const limit = 2880
+      const prices = await zealousAPI.getTokenPrice(tokenAddress, limit, 0)
 
-      if (!priceHistory || priceHistory.length === 0) {
+      if (!prices || prices.length === 0) {
         return 0
       }
 
-      // Sort by timestamp to get chronological order
-      const sortedHistory = priceHistory
-        .filter((p) => p.priceUSD && !isNaN(p.priceUSD) && p.priceUSD > 0)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      // Sort all prices by timestamp first to get chronological order
+      prices.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
-      if (sortedHistory.length === 0) {
+      // Filter to get only valid prices from the past
+      const validPrices = prices.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        const isValidPrice = typeof price.priceUSD === "number" && !isNaN(price.priceUSD) && price.priceUSD > 0
+        const isNotFuture = priceDate <= now
+        return isValidPrice && isNotFuture
+      })
+
+      if (validPrices.length === 0) {
         return 0
       }
 
-      // Get price from 24 hours ago (first valid price in our dataset)
-      const price24hAgo = sortedHistory[0].priceUSD
+      // Get data from the most recent time backwards 24 hours
+      const mostRecentTime = new Date(validPrices[validPrices.length - 1].timestamp)
+      const startTime = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000)
 
-      if (price24hAgo && price24hAgo > 0 && currentPrice > 0) {
-        return ((currentPrice - price24hAgo) / price24hAgo) * 100
+      let filteredPrices = validPrices.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        return priceDate >= startTime
+      })
+
+      // If no data in the specific time range, get the most recent available data
+      if (filteredPrices.length === 0) {
+        filteredPrices = validPrices.slice(-Math.min(100, validPrices.length))
+      }
+
+      // Calculate price change using first and last data points from filtered array
+      if (filteredPrices.length > 1) {
+        const oldPrice = filteredPrices[0].priceUSD || 0
+        const newPrice = filteredPrices[filteredPrices.length - 1].priceUSD || 0
+        if (oldPrice > 0) {
+          return ((newPrice - oldPrice) / oldPrice) * 100
+        }
       }
 
       return 0
@@ -202,7 +226,7 @@ export default function TokenPage() {
         }
 
         // Calculate accurate 24hr price change
-        const priceChange24h = await calculate24hrChange(tokenAddress, currentPrice)
+        const priceChange24h = await getChartPriceChange(tokenAddress, currentPrice)
 
         // Get all pools to find ones containing this token
         const allPools = await zealousAPI.getLatestPools(100, 0, "tvl", "desc")
