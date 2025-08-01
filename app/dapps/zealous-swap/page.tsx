@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, DollarSign, Activity, ExternalLink, Droplets, Coins } from "lucide-react"
+import { ArrowLeft, DollarSign, ExternalLink, Droplets, Coins } from "lucide-react"
 import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
@@ -21,6 +21,8 @@ export default function ZealousSwapPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
+
+  const [tokenCount, setTokenCount] = useState<number>(0)
 
   const zealousAPI = new ZealousAPI()
 
@@ -38,7 +40,21 @@ export default function ZealousSwapPage() {
       }
     }
 
-    fetchProtocolStats()
+    const fetchTokenCount = async () => {
+      try {
+        // Fetch first page to get total count efficiently
+        const tokensData = await zealousAPI.getTokens(100, 0) // Get up to 100 tokens
+        setTokenCount(tokensData.length)
+      } catch (err) {
+        console.error("Failed to fetch token count:", err)
+        setTokenCount(0)
+      }
+    }
+
+    const fetchData = async () => {
+      await Promise.all([fetchProtocolStats(), fetchTokenCount()])
+    }
+    fetchData()
   }, [])
 
   const handleSearch = (query: string) => {
@@ -138,14 +154,14 @@ export default function ZealousSwapPage() {
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Total Volume</CardTitle>
-                <Activity className="h-4 w-4 text-blue-400" />
+                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Verified Tokens</CardTitle>
+                <Coins className="h-4 w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-white font-orbitron">
-                  {loading ? "Loading..." : error ? "Error" : formatCurrency(protocolStats?.totalVolumeUSD || 0)}
+                  {loading ? "Loading..." : error ? "Error" : tokenCount}
                 </div>
-                <p className="text-xs text-blue-300 mt-1 font-inter">All-time volume</p>
+                <p className="text-xs text-blue-300 mt-1 font-inter">Active tokens</p>
               </CardContent>
             </Card>
 
