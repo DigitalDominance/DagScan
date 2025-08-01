@@ -4,13 +4,17 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { motion } from "motion/react"
 import { Button } from "@/components/ui/button"
-import { Search, Menu, X } from "lucide-react"
+import { Search, Menu, X, Coins, Activity, Zap, Wallet, CuboidIcon as Cube, Code } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { ZealousAPI, type Token } from "@/lib/zealous-api"
+import { KasplexAPI } from "@/lib/api"
 
 interface SearchSuggestion {
-  type: "address" | "transaction" | "block"
+  type: "address" | "transaction" | "block" | "token" | "dapp"
   value: string
   display: string
+  logo?: string
+  subtitle?: string
 }
 
 interface NavigationProps {
@@ -24,20 +28,106 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
   const [searchQuery, setSearchQuery] = useState("")
   const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [tokens, setTokens] = useState<Token[]>([])
+  const [contractCheckCache, setContractCheckCache] = useState<Record<string, boolean>>({})
   const router = useRouter()
+  const zealousAPI = new ZealousAPI()
 
-  const detectSearchType = (query: string): SearchSuggestion[] => {
+  // Get token logo URL using the same logic as VerifiedTokensList
+  const getTokenLogoUrl = (logoURI: string): string => {
+    if (!logoURI) return "/placeholder.svg?height=40&width=40"
+    if (logoURI.startsWith("http")) return logoURI
+    return `https://testnet.zealousswap.com/images/${logoURI}`
+  }
+
+  // Fetch tokens for search suggestions
+  useEffect(() => {
+    const fetchTokens = async () => {
+      try {
+        const tokenData = await zealousAPI.getTokens(50, 0) // Get top 50 tokens for search
+        setTokens(tokenData)
+      } catch (error) {
+        console.warn("Failed to fetch tokens for search:", error)
+      }
+    }
+    fetchTokens()
+  }, [])
+
+  const detectSearchType = async (query: string): Promise<SearchSuggestion[]> => {
     const suggestions: SearchSuggestion[] = []
+
+    if (query.length >= 2) {
+      // Search for tokens by symbol or name
+      const matchingTokens = tokens
+        .filter(
+          (token) =>
+            token.symbol.toLowerCase().includes(query.toLowerCase()) ||
+            token.name.toLowerCase().includes(query.toLowerCase()) ||
+            token.address.toLowerCase().includes(query.toLowerCase()),
+        )
+        .slice(0, 3) // Limit to 3 token suggestions
+
+      matchingTokens.forEach((token) => {
+        suggestions.push({
+          type: "token",
+          value: token.address,
+          display: `${token.symbol} - ${token.name}`,
+          subtitle: `$${token.priceUSD?.toFixed(6) || "0.00"}`,
+          logo: getTokenLogoUrl(token.logoURI), // Use proper logo URL logic
+        })
+      })
+
+      // Search for dapps
+      if (query.toLowerCase().includes("zealous") || query.toLowerCase().includes("swap")) {
+        suggestions.push({
+          type: "dapp",
+          value: "zealous-swap",
+          display: "Zealous Swap",
+          subtitle: "Decentralized Exchange",
+          logo: "/zealous-logo.png",
+        })
+      }
+    }
 
     if (query.length >= 3) {
       // Check if it looks like an address
       if (query.startsWith("0x") && query.length >= 10) {
         if (query.length === 42) {
-          suggestions.push({
-            type: "address",
-            value: query,
-            display: `Address: ${query.slice(0, 10)}...${query.slice(-8)}`,
-          })
+          // Check if we already know if this is a contract
+          if (contractCheckCache[query.toLowerCase()]) {
+            const isContract = contractCheckCache[query.toLowerCase()]
+            suggestions.push({
+              type: "address",
+              value: query,
+              display: `${isContract ? "Contract" : "Address"}: ${query.slice(0, 10)}...${query.slice(-8)}`,
+            })
+          } else {
+            // Check if it's a contract via RPC
+            try {
+              const api = new KasplexAPI("kasplex")
+              const addressDetails = await api.getAddressDetails(query)
+              const isContract = addressDetails.contractInfo?.isContract || false
+
+              // Cache the result
+              setContractCheckCache((prev) => ({
+                ...prev,
+                [query.toLowerCase()]: isContract,
+              }))
+
+              suggestions.push({
+                type: "address",
+                value: query,
+                display: `${isContract ? "Contract" : "Address"}: ${query.slice(0, 10)}...${query.slice(-8)}`,
+              })
+            } catch (error) {
+              // If RPC fails, default to address
+              suggestions.push({
+                type: "address",
+                value: query,
+                display: `Address: ${query.slice(0, 10)}...${query.slice(-8)}`,
+              })
+            }
+          }
         } else if (query.length === 66) {
           suggestions.push({
             type: "transaction",
@@ -72,15 +162,19 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
   }
 
   useEffect(() => {
-    if (searchQuery.trim()) {
-      const suggestions = detectSearchType(searchQuery.trim())
-      setSearchSuggestions(suggestions)
-      setShowSuggestions(suggestions.length > 0)
-    } else {
-      setSearchSuggestions([])
-      setShowSuggestions(false)
+    const updateSuggestions = async () => {
+      if (searchQuery.trim()) {
+        const suggestions = await detectSearchType(searchQuery.trim())
+        setSearchSuggestions(suggestions)
+        setShowSuggestions(suggestions.length > 0)
+      } else {
+        setSearchSuggestions([])
+        setShowSuggestions(false)
+      }
     }
-  }, [searchQuery])
+
+    updateSuggestions()
+  }, [searchQuery, tokens, contractCheckCache])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -91,13 +185,45 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
   }
 
   const handleSuggestionClick = (suggestion: SearchSuggestion) => {
-    setSearchQuery(suggestion.value)
-    onSearch(suggestion.value)
+    if (suggestion.type === "token") {
+      router.push(`/tokens/${suggestion.value}`)
+    } else if (suggestion.type === "dapp") {
+      router.push(`/dapps/${suggestion.value}`)
+    } else if (suggestion.type === "transaction") {
+      router.push(`/tx/${suggestion.value}`)
+    } else if (suggestion.type === "address") {
+      // Go directly to address page instead of search page
+      router.push(`/address/${suggestion.value}`)
+    } else if (suggestion.type === "block") {
+      router.push(`/block/${suggestion.value}`)
+    } else {
+      setSearchQuery(suggestion.value)
+      onSearch(suggestion.value)
+    }
     setShowSuggestions(false)
   }
 
   const handleLogoClick = () => {
     router.push("/")
+  }
+
+  const getSuggestionIcon = (suggestion: SearchSuggestion) => {
+    switch (suggestion.type) {
+      case "token":
+        return <Coins className="h-4 w-4 text-yellow-400" />
+      case "dapp":
+        return <Activity className="h-4 w-4 text-cyan-400" />
+      case "transaction":
+        return <Zap className="h-4 w-4 text-blue-400" />
+      case "address":
+        // Check if it's a contract based on the display text
+        const isContract = suggestion.display.startsWith("Contract:")
+        return isContract ? <Code className="h-4 w-4 text-blue-400" /> : <Wallet className="h-4 w-4 text-green-400" />
+      case "block":
+        return <Cube className="h-4 w-4 text-purple-400" />
+      default:
+        return <Search className="h-4 w-4 text-white/50" />
+    }
   }
 
   return (
@@ -142,7 +268,7 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
               <form onSubmit={handleSearch} className="relative">
                 <input
                   type="text"
-                  placeholder="Search blocks, txns, addresses..."
+                  placeholder="Search blocks, txns, addresses, tokens..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setShowSuggestions(searchSuggestions.length > 0)}
@@ -154,14 +280,30 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
 
               {/* Search Suggestions */}
               {showSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden z-50">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden z-50 max-h-80 overflow-y-auto">
                   {searchSuggestions.map((suggestion, index) => (
                     <button
                       key={index}
                       onClick={() => handleSuggestionClick(suggestion)}
-                      className="w-full px-4 py-2 text-left text-white hover:bg-white/10 transition-colors font-inter text-sm"
+                      className="w-full px-4 py-3 text-left text-white hover:bg-white/10 transition-colors font-orbitron text-sm flex items-center gap-3"
                     >
-                      {suggestion.display}
+                      {suggestion.logo ? (
+                        <img
+                          src={suggestion.logo || "/placeholder.svg"}
+                          alt=""
+                          className="h-6 w-6 rounded-full flex-shrink-0"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement
+                            target.src = "/placeholder.svg?height=24&width=24"
+                          }}
+                        />
+                      ) : (
+                        getSuggestionIcon(suggestion)
+                      )}
+                      <div className="flex-1">
+                        <div className="font-bold">{suggestion.display}</div>
+                        {suggestion.subtitle && <div className="text-xs text-white/50">{suggestion.subtitle}</div>}
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -178,7 +320,7 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                   className={`text-xs font-rajdhani font-semibold px-3 py-1 relative ${
                     currentNetwork === "kasplex"
                       ? "bg-black/60 text-white border border-transparent before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-purple-500 before:to-blue-500 before:-z-10"
-                      : "text-white/70 hover:text-white bg-black/40 hover:bg-black/60 border border-transparent hover:before:absolute hover:before:inset-0 hover:before:rounded-md hover:before:p-[1px] hover:before:bg-gradient-to-r hover:before:from-purple-500 hover:before:to-blue-500 hover:before:-z-10 hover:before:opacity-50"
+                      : "text-white/70 hover:text-white bg-black/40 hover:bg-black/60 border border-transparent hover:before:absolute hover:before:inset-0 hover:before:rounded-md hover:before:p-[1px] hover:before:bg-gradient-to-r hover:before:from-purple-500 hover:to-blue-500 hover:before:-z-10 hover:before:opacity-50"
                   } transition-all duration-300`}
                 >
                   <span className="relative z-10">
@@ -280,14 +422,30 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
 
                 {/* Mobile Search Suggestions */}
                 {showSuggestions && searchSuggestions.length > 0 && (
-                  <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden z-50">
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-black/90 backdrop-blur-xl border border-white/20 rounded-lg overflow-hidden z-50 max-h-60 overflow-y-auto">
                     {searchSuggestions.map((suggestion, index) => (
                       <button
                         key={index}
                         onClick={() => handleSuggestionClick(suggestion)}
-                        className="w-full px-4 py-2 text-left text-white hover:bg-white/10 transition-colors font-inter text-sm"
+                        className="w-full px-4 py-3 text-left text-white hover:bg-white/10 transition-colors font-orbitron text-sm flex items-center gap-3"
                       >
-                        {suggestion.display}
+                        {suggestion.logo ? (
+                          <img
+                            src={suggestion.logo || "/placeholder.svg"}
+                            alt=""
+                            className="h-6 w-6 rounded-full flex-shrink-0"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/placeholder.svg?height=24&width=24"
+                            }}
+                          />
+                        ) : (
+                          getSuggestionIcon(suggestion)
+                        )}
+                        <div className="flex-1">
+                          <div className="font-bold">{suggestion.display}</div>
+                          {suggestion.subtitle && <div className="text-xs text-white/50">{suggestion.subtitle}</div>}
+                        </div>
                       </button>
                     ))}
                   </div>
