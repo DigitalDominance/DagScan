@@ -4,7 +4,6 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart3, X } from "lucide-react"
 import { ZealousAPI } from "@/lib/zealous-api"
 
@@ -25,7 +24,6 @@ export default function ZealousVolumeChart() {
   const [volumeData, setVolumeData] = useState<VolumeData[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [timeRange, setTimeRange] = useState<"24H" | "7D" | "30D">("24H")
   const [tooltip, setTooltip] = useState<TooltipData>({
     x: 0,
     y: 0,
@@ -65,22 +63,8 @@ export default function ZealousVolumeChart() {
         setLoading(true)
         setError(null)
 
-        let hours: number
-        switch (timeRange) {
-          case "24H":
-            hours = 24
-            break
-          case "7D":
-            hours = 168 // 7 * 24
-            break
-          case "30D":
-            hours = 720 // 30 * 24
-            break
-          default:
-            hours = 24
-        }
-
-        const data = await zealousAPI.getVolumeHistory(hours)
+        // Always fetch 24 hours of data
+        const data = await zealousAPI.getVolumeHistory(24)
 
         if (!data || data.length === 0) {
           setError("No volume data available")
@@ -107,7 +91,7 @@ export default function ZealousVolumeChart() {
     }
 
     fetchVolumeData()
-  }, [timeRange])
+  }, [])
 
   const closeTooltip = () => {
     setTooltip((prev) => ({ ...prev, visible: false }))
@@ -297,7 +281,7 @@ export default function ZealousVolumeChart() {
         <CardHeader>
           <CardTitle className="text-white font-orbitron flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-purple-400" />
-            Trading Volume
+            Trading Volume (24 Hours)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -312,24 +296,12 @@ export default function ZealousVolumeChart() {
   return (
     <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
       <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <CardTitle className="text-white font-orbitron flex items-center gap-2">
-              <BarChart3 className="h-5 w-5 text-purple-400" />
-              Trading Volume
-            </CardTitle>
-            <div className="text-purple-400 font-orbitron">Total: {formatCurrency(totalVolume)}</div>
-          </div>
-          <Select value={timeRange} onValueChange={(value) => setTimeRange(value as typeof timeRange)}>
-            <SelectTrigger className="w-20 bg-black/40 border-white/20 text-white">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="bg-black/90 border-white/20 text-white">
-              <SelectItem value="24H">24H</SelectItem>
-              <SelectItem value="7D">7D</SelectItem>
-              <SelectItem value="30D">30D</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-4">
+          <CardTitle className="text-white font-orbitron flex items-center gap-2">
+            <BarChart3 className="h-5 w-5 text-purple-400" />
+            Trading Volume (24 Hours)
+          </CardTitle>
+          <div className="text-purple-400 font-orbitron">Total: {formatCurrency(totalVolume)}</div>
         </div>
       </CardHeader>
       <CardContent>
