@@ -277,7 +277,7 @@ export default function ZealousVolumeChart() {
             <div className="space-y-2">
               <div className="font-orbitron text-purple-400 text-base font-bold">{formatCurrency(tooltip.volume)}</div>
               <div className="font-rajdhani text-white/80 text-sm">24 Hour Trading Volume</div>
-              <div className="font-rajdhani text-white/60 text-xs">All-time cumulative volume</div>
+              <div className="font-rajdhani text-white/60 text-xs">24 hour cumulative volume</div>
             </div>
           </div>
         )}
