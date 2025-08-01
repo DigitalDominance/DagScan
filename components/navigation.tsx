@@ -72,7 +72,6 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
           type: "token",
           value: token.address,
           display: `${token.symbol} - ${token.name}`,
-          subtitle: `$${token.priceUSD?.toFixed(6) || "0.00"}`,
           logo: getTokenLogoUrl(token.logoURI), // Use proper logo URL logic
         })
       })
