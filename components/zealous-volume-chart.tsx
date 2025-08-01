@@ -5,30 +5,23 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { BarChart3, X } from "lucide-react"
-import { ZealousAPI } from "@/lib/zealous-api"
-
-interface VolumeData {
-  timestamp: string
-  volumeUSD: number
-}
+import { ZealousAPI, type ProtocolStats } from "@/lib/zealous-api"
 
 interface TooltipData {
   x: number
   y: number
   volume: number
-  timestamp: string
   visible: boolean
 }
 
 export default function ZealousVolumeChart() {
-  const [volumeData, setVolumeData] = useState<VolumeData[]>([])
+  const [totalVolume, setTotalVolume] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<TooltipData>({
     x: 0,
     y: 0,
     volume: 0,
-    timestamp: "",
     visible: false,
   })
 
@@ -47,41 +40,22 @@ export default function ZealousVolumeChart() {
     return `$${value.toFixed(2)}`
   }
 
-  const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp)
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    })
-  }
-
   useEffect(() => {
     const fetchVolumeData = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        // Always fetch 24 hours of data
-        const data = await zealousAPI.getVolumeHistory(24)
+        // Use the same method as the main page to get protocol stats
+        const protocolStats: ProtocolStats = await zealousAPI.getProtocolStats()
 
-        if (!data || data.length === 0) {
-          setError("No volume data available")
+        if (!protocolStats) {
+          setError("No protocol data available")
           return
         }
 
-        // Sort by timestamp and filter valid data
-        const validData = data
-          .filter((item) => item.volumeUSD && !isNaN(item.volumeUSD) && item.volumeUSD > 0)
-          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-
-        if (validData.length === 0) {
-          setError("No valid volume data available")
-          return
-        }
-
-        setVolumeData(validData)
+        // Just use the totalVolumeUSD directly
+        setTotalVolume(protocolStats.totalVolumeUSD || 0)
       } catch (err) {
         console.error("Failed to fetch volume data:", err)
         setError("Failed to load volume data")
@@ -97,16 +71,27 @@ export default function ZealousVolumeChart() {
     setTooltip((prev) => ({ ...prev, visible: false }))
   }
 
-  // Custom volume chart component
-  const VolumeChart = ({ data }: { data: VolumeData[] }) => {
-    if (data.length === 0) return null
+  // Enhanced volume chart component with proper axes
+  const VolumeChart = ({ volume }: { volume: number }) => {
+    if (volume === 0) return null
 
-    const maxVolume = Math.max(...data.map((d) => d.volumeUSD))
-    const chartHeight = 300
-    const chartWidth = 800
-    const barWidth = Math.max(2, chartWidth / data.length - 2)
+    const chartHeight = 280
+    const chartWidth = 700
+    const marginLeft = 80
+    const marginBottom = 40
+    const marginTop = 20
+    const marginRight = 20
 
-    const handleBarClick = (event: React.MouseEvent, volume: VolumeData, index: number) => {
+    const plotWidth = chartWidth - marginLeft - marginRight
+    const plotHeight = chartHeight - marginTop - marginBottom
+
+    const barWidth = 120
+    const barX = marginLeft + (plotWidth - barWidth) / 2
+
+    // Y-axis values
+    const yAxisValues = [volume, volume * 0.8, volume * 0.6, volume * 0.4, volume * 0.2, 0]
+
+    const handleBarClick = (event: React.MouseEvent) => {
       const rect = event.currentTarget.getBoundingClientRect()
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
@@ -114,8 +99,7 @@ export default function ZealousVolumeChart() {
       setTooltip({
         x,
         y,
-        volume: volume.volumeUSD,
-        timestamp: volume.timestamp,
+        volume: volume,
         visible: true,
       })
 
@@ -127,7 +111,7 @@ export default function ZealousVolumeChart() {
       }
     }
 
-    const handleBarTouch = (event: React.TouchEvent, volume: VolumeData, index: number) => {
+    const handleBarTouch = (event: React.TouchEvent) => {
       event.preventDefault()
       const rect = event.currentTarget.getBoundingClientRect()
       const touch = event.touches[0]
@@ -137,8 +121,7 @@ export default function ZealousVolumeChart() {
       setTooltip({
         x,
         y,
-        volume: volume.volumeUSD,
-        timestamp: volume.timestamp,
+        volume: volume,
         visible: true,
       })
 
@@ -149,13 +132,12 @@ export default function ZealousVolumeChart() {
     }
 
     return (
-      <div className="w-full h-80 relative overflow-hidden">
+      <div className="w-full relative" style={{ height: `${chartHeight + 60}px` }}>
         <svg
           width="100%"
-          height="100%"
+          height={chartHeight}
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
           className="overflow-visible"
-          preserveAspectRatio="none"
         >
           <defs>
             <linearGradient id="volumeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -164,97 +146,138 @@ export default function ZealousVolumeChart() {
               <stop offset="66%" stopColor="#3B82F6" />
               <stop offset="100%" stopColor="#1E1B4B" />
             </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
           </defs>
 
-          {/* Grid lines */}
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-            <line
-              key={ratio}
-              x1="0"
-              y1={chartHeight * ratio}
-              x2={chartWidth}
-              y2={chartHeight * ratio}
-              stroke="rgba(255,255,255,0.1)"
-              strokeDasharray="2,2"
-            />
-          ))}
+          {/* Chart background */}
+          <rect
+            x={marginLeft}
+            y={marginTop}
+            width={plotWidth}
+            height={plotHeight}
+            fill="rgba(0,0,0,0.2)"
+            stroke="rgba(255,255,255,0.1)"
+            strokeWidth="1"
+          />
 
-          {/* Volume bars */}
-          {data.map((volume, index) => {
-            const barHeight = (volume.volumeUSD / maxVolume) * chartHeight
-            const x = (index / data.length) * chartWidth
-            const y = chartHeight - barHeight
-
+          {/* Horizontal grid lines */}
+          {yAxisValues.slice(0, -1).map((value, index) => {
+            const y = marginTop + (index / (yAxisValues.length - 1)) * plotHeight
             return (
-              <rect
+              <line
                 key={index}
-                x={x}
-                y={y}
-                width={barWidth}
-                height={barHeight}
-                fill="url(#volumeGradient)"
-                className="hover:opacity-80 transition-opacity cursor-pointer"
-                onClick={(e) => handleBarClick(e, volume, index)}
-                onTouchStart={(e) => handleBarTouch(e, volume, index)}
-                style={{ touchAction: "manipulation" }}
+                x1={marginLeft}
+                y1={y}
+                x2={marginLeft + plotWidth}
+                y2={y}
+                stroke="rgba(255,255,255,0.1)"
+                strokeDasharray="2,2"
               />
             )
           })}
+
+          {/* Y-axis line */}
+          <line
+            x1={marginLeft}
+            y1={marginTop}
+            x2={marginLeft}
+            y2={marginTop + plotHeight}
+            stroke="rgba(255,255,255,0.3)"
+            strokeWidth="2"
+          />
+
+          {/* X-axis line */}
+          <line
+            x1={marginLeft}
+            y1={marginTop + plotHeight}
+            x2={marginLeft + plotWidth}
+            y2={marginTop + plotHeight}
+            stroke="rgba(255,255,255,0.3)"
+            strokeWidth="2"
+          />
+
+          {/* Volume bar with glow effect */}
+          <rect
+            x={barX}
+            y={marginTop}
+            width={barWidth}
+            height={plotHeight}
+            fill="url(#volumeGradient)"
+            filter="url(#glow)"
+            className="hover:opacity-80 transition-opacity cursor-pointer"
+            onClick={handleBarClick}
+            onTouchStart={handleBarTouch}
+            style={{ touchAction: "manipulation" }}
+            rx="4"
+          />
+
+          {/* Y-axis labels */}
+          {yAxisValues.map((value, index) => {
+            const y = marginTop + (index / (yAxisValues.length - 1)) * plotHeight
+            return (
+              <text
+                key={index}
+                x={marginLeft - 10}
+                y={y + 4}
+                textAnchor="end"
+                className="fill-white text-xs font-rajdhani"
+                style={{ fontSize: "12px" }}
+              >
+                {formatCurrency(value)}
+              </text>
+            )
+          })}
+
+          {/* X-axis label */}
+          <text
+            x={marginLeft + plotWidth / 2}
+            y={marginTop + plotHeight + 30}
+            textAnchor="middle"
+            className="fill-white/70 text-sm font-rajdhani"
+            style={{ fontSize: "14px" }}
+          >
+            Total Trading Volume
+          </text>
+
+          {/* Y-axis title */}
+          <text
+            x={20}
+            y={marginTop + plotHeight / 2}
+            textAnchor="middle"
+            className="fill-white/70 text-sm font-rajdhani"
+            style={{ fontSize: "14px" }}
+            transform={`rotate(-90, 20, ${marginTop + plotHeight / 2})`}
+          >
+            Volume (USD)
+          </text>
         </svg>
-
-        {/* Y-axis labels */}
-        <div className="absolute left-0 top-0 h-full flex flex-col justify-between text-xs text-white/50 font-rajdhani -ml-16 sm:-ml-20 pointer-events-none select-none">
-          <span>{formatCurrency(maxVolume)}</span>
-          <span>{formatCurrency(maxVolume * 0.75)}</span>
-          <span>{formatCurrency(maxVolume * 0.5)}</span>
-          <span>{formatCurrency(maxVolume * 0.25)}</span>
-          <span>$0</span>
-        </div>
-
-        {/* X-axis labels */}
-        <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-white/50 font-rajdhani mt-2 px-2 pointer-events-none select-none">
-          {data.length > 0 && (
-            <>
-              <span className="truncate">
-                {new Date(data[0].timestamp).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-              </span>
-              {data.length > 2 && (
-                <span className="truncate">
-                  {new Date(data[Math.floor(data.length / 2)].timestamp).toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                  })}
-                </span>
-              )}
-              <span className="truncate">
-                {new Date(data[data.length - 1].timestamp).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </span>
-            </>
-          )}
-        </div>
 
         {/* Tooltip */}
         {tooltip.visible && (
           <div
-            className="absolute z-50 bg-black/90 border border-white/20 rounded-lg p-3 text-white text-sm font-inter backdrop-blur-xl max-w-xs pointer-events-none select-none"
+            className="absolute z-50 bg-black/95 border border-white/30 rounded-lg p-4 text-white text-sm font-inter backdrop-blur-xl shadow-2xl"
             style={{
-              left: tooltip.x + 10,
-              top: tooltip.y - 10,
+              left: Math.min(tooltip.x + 10, chartWidth - 200),
+              top: Math.max(tooltip.y - 80, 10),
               transform: tooltip.x > chartWidth / 2 ? "translateX(-100%)" : "none",
             }}
           >
             <button
               onClick={closeTooltip}
-              className="absolute top-1 right-1 text-white/50 hover:text-white pointer-events-auto"
+              className="absolute top-2 right-2 text-white/50 hover:text-white transition-colors"
             >
-              <X className="h-3 w-3" />
+              <X className="h-4 w-4" />
             </button>
-            <div className="space-y-1">
-              <div className="font-orbitron text-purple-400">Volume: {formatCurrency(tooltip.volume)}</div>
-              <div className="font-rajdhani text-white/70">{formatDate(tooltip.timestamp)}</div>
+            <div className="space-y-2">
+              <div className="font-orbitron text-purple-400 text-base font-bold">{formatCurrency(tooltip.volume)}</div>
+              <div className="font-rajdhani text-white/80 text-sm">Total Trading Volume</div>
+              <div className="font-rajdhani text-white/60 text-xs">All-time cumulative volume</div>
             </div>
           </div>
         )}
@@ -281,7 +304,7 @@ export default function ZealousVolumeChart() {
         <CardHeader>
           <CardTitle className="text-white font-orbitron flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-purple-400" />
-            Trading Volume (24 Hours)
+            Trading Volume
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -291,23 +314,22 @@ export default function ZealousVolumeChart() {
     )
   }
 
-  const totalVolume = volumeData.reduce((sum, item) => sum + item.volumeUSD, 0)
-
   return (
     <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
       <CardHeader>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <CardTitle className="text-white font-orbitron flex items-center gap-2">
             <BarChart3 className="h-5 w-5 text-purple-400" />
-            Trading Volume (24 Hours)
+            Trading Volume
           </CardTitle>
-          <div className="text-purple-400 font-orbitron">Total: {formatCurrency(totalVolume)}</div>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="text-purple-400 font-orbitron text-lg font-bold">{formatCurrency(totalVolume)}</div>
+            <div className="text-white/60 font-rajdhani text-sm">Total Volume</div>
+          </div>
         </div>
       </CardHeader>
-      <CardContent>
-        <div className="pl-16 sm:pl-20 pr-4">
-          <VolumeChart data={volumeData} />
-        </div>
+      <CardContent className="p-6">
+        <VolumeChart volume={totalVolume} />
       </CardContent>
     </Card>
   )
