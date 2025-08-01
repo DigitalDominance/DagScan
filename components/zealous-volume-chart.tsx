@@ -242,7 +242,7 @@ export default function ZealousVolumeChart() {
             className="fill-white/70 text-sm font-rajdhani"
             style={{ fontSize: "14px" }}
           >
-            Total Trading Volume
+            24 Hour Trading Volume
           </text>
 
           {/* Y-axis title */}
@@ -276,7 +276,7 @@ export default function ZealousVolumeChart() {
             </button>
             <div className="space-y-2">
               <div className="font-orbitron text-purple-400 text-base font-bold">{formatCurrency(tooltip.volume)}</div>
-              <div className="font-rajdhani text-white/80 text-sm">Total Trading Volume</div>
+              <div className="font-rajdhani text-white/80 text-sm">24 Hour Trading Volume</div>
               <div className="font-rajdhani text-white/60 text-xs">All-time cumulative volume</div>
             </div>
           </div>
@@ -324,7 +324,7 @@ export default function ZealousVolumeChart() {
           </CardTitle>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <div className="text-purple-400 font-orbitron text-lg font-bold">{formatCurrency(totalVolume)}</div>
-            <div className="text-white/60 font-rajdhani text-sm">Total Volume</div>
+            <div className="text-white/60 font-rajdhani text-sm">24 Hour Volume</div>
           </div>
         </div>
       </CardHeader>
