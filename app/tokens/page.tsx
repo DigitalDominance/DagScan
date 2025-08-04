@@ -457,30 +457,64 @@ export default function TokensPage() {
                     {tokenStats?.topGainers.length === 0 ? (
                       <div className="text-center text-white/50 py-8">No gainers today</div>
                     ) : (
-                      tokenStats?.topGainers.map((token, index) => (
-                        <div
-                          key={token.address}
-                          className={`flex items-center gap-3 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(index, true)}`}
-                          onClick={() => handleTokenClick(token.address)}
-                        >
-                          <img
-                            src={token.logoURI || "/placeholder.svg"}
-                            alt={token.symbol}
-                            className="h-8 w-8 rounded-full flex-shrink-0"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=32&width=32"
-                            }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm text-white font-orbitron truncate">{token.symbol}</div>
-                            <div className="text-xs text-white/50 truncate">{token.name}</div>
+                      <div className="space-y-3">
+                        {/* First card - full width */}
+                        {tokenStats?.topGainers[0] && (
+                          <div
+                            key={tokenStats.topGainers[0].address}
+                            className={`flex items-center gap-3 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(0, true)}`}
+                            onClick={() => handleTokenClick(tokenStats.topGainers[0].address)}
+                          >
+                            <img
+                              src={tokenStats.topGainers[0].logoURI || "/placeholder.svg"}
+                              alt={tokenStats.topGainers[0].symbol}
+                              className="h-8 w-8 rounded-full flex-shrink-0"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.src = "/placeholder.svg?height=32&width=32"
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-white font-orbitron truncate">
+                                {tokenStats.topGainers[0].symbol}
+                              </div>
+                              <div className="text-xs text-white/50 truncate">{tokenStats.topGainers[0].name}</div>
+                            </div>
+                            <div className="text-sm text-green-400 font-orbitron">
+                              {formatPercent(tokenStats.topGainers[0].priceChange24h)}
+                            </div>
                           </div>
-                          <div className="text-sm text-green-400 font-orbitron">
-                            {formatPercent(token.priceChange24h)}
+                        )}
+
+                        {/* Remaining cards - 2 per row */}
+                        {tokenStats?.topGainers.slice(1).length > 0 && (
+                          <div className="grid grid-cols-2 gap-3">
+                            {tokenStats.topGainers.slice(1).map((token, index) => (
+                              <div
+                                key={token.address}
+                                className={`flex items-center gap-2 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(index + 1, true)}`}
+                                onClick={() => handleTokenClick(token.address)}
+                              >
+                                <img
+                                  src={token.logoURI || "/placeholder.svg"}
+                                  alt={token.symbol}
+                                  className="h-6 w-6 rounded-full flex-shrink-0"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.src = "/placeholder.svg?height=24&width=24"
+                                  }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs text-white font-orbitron truncate">{token.symbol}</div>
+                                  <div className="text-xs text-green-400 font-orbitron">
+                                    {formatPercent(token.priceChange24h)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      ))
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -503,30 +537,64 @@ export default function TokensPage() {
                     {tokenStats?.topLosers.length === 0 ? (
                       <div className="text-center text-white/50 py-8">No losers today</div>
                     ) : (
-                      tokenStats?.topLosers.map((token, index) => (
-                        <div
-                          key={token.address}
-                          className={`flex items-center gap-3 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(index, false)}`}
-                          onClick={() => handleTokenClick(token.address)}
-                        >
-                          <img
-                            src={token.logoURI || "/placeholder.svg"}
-                            alt={token.symbol}
-                            className="h-8 w-8 rounded-full flex-shrink-0"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement
-                              target.src = "/placeholder.svg?height=32&width=32"
-                            }}
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="text-sm text-white font-orbitron truncate">{token.symbol}</div>
-                            <div className="text-xs text-white/50 truncate">{token.name}</div>
+                      <div className="space-y-3">
+                        {/* First card - full width */}
+                        {tokenStats?.topLosers[0] && (
+                          <div
+                            key={tokenStats.topLosers[0].address}
+                            className={`flex items-center gap-3 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(0, false)}`}
+                            onClick={() => handleTokenClick(tokenStats.topLosers[0].address)}
+                          >
+                            <img
+                              src={tokenStats.topLosers[0].logoURI || "/placeholder.svg"}
+                              alt={tokenStats.topLosers[0].symbol}
+                              className="h-8 w-8 rounded-full flex-shrink-0"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement
+                                target.src = "/placeholder.svg?height=32&width=32"
+                              }}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm text-white font-orbitron truncate">
+                                {tokenStats.topLosers[0].symbol}
+                              </div>
+                              <div className="text-xs text-white/50 truncate">{tokenStats.topLosers[0].name}</div>
+                            </div>
+                            <div className="text-sm text-red-400 font-orbitron">
+                              {formatPercent(tokenStats.topLosers[0].priceChange24h)}
+                            </div>
                           </div>
-                          <div className="text-sm text-red-400 font-orbitron">
-                            {formatPercent(token.priceChange24h)}
+                        )}
+
+                        {/* Remaining cards - 2 per row */}
+                        {tokenStats?.topLosers.slice(1).length > 0 && (
+                          <div className="grid grid-cols-2 gap-3">
+                            {tokenStats.topLosers.slice(1).map((token, index) => (
+                              <div
+                                key={token.address}
+                                className={`flex items-center gap-2 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(index + 1, false)}`}
+                                onClick={() => handleTokenClick(token.address)}
+                              >
+                                <img
+                                  src={token.logoURI || "/placeholder.svg"}
+                                  alt={token.symbol}
+                                  className="h-6 w-6 rounded-full flex-shrink-0"
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement
+                                    target.src = "/placeholder.svg?height=24&width=24"
+                                  }}
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs text-white font-orbitron truncate">{token.symbol}</div>
+                                  <div className="text-xs text-red-400 font-orbitron">
+                                    {formatPercent(token.priceChange24h)}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
-                        </div>
-                      ))
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
