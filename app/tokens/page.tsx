@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Coins, TrendingUp, Activity, BarChart3, Trophy } from "lucide-react"
+import { Coins, TrendingUp, TrendingDown, Activity, BarChart3 } from "lucide-react"
 import CosmicBackground from "@/components/cosmic-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
@@ -18,6 +18,13 @@ interface TokenStats {
   total24hVolume: number
   averagePriceChange: number
   topGainers: Array<{
+    symbol: string
+    name: string
+    logoURI: string
+    priceChange24h: number
+    address: string
+  }>
+  topLosers: Array<{
     symbol: string
     name: string
     logoURI: string
@@ -69,14 +76,18 @@ export default function TokensPage() {
   // Simplified token supply fetch with fallback
   const fetchTokenSupply = async (address: string): Promise<number> => {
     try {
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
+
       const totalSupplyMethodId = "0x18160ddd"
-      const result = await kasplexAPI.rpcCall("eth_call", [
+      const rpcPromise = kasplexAPI.rpcCall("eth_call", [
         {
           to: address,
           data: totalSupplyMethodId,
         },
         "latest",
       ])
+
+      const result = await Promise.race([rpcPromise, timeoutPromise])
 
       if (result && result !== "0x") {
         const supply = Number.parseInt(result, 16) / Math.pow(10, 18)
@@ -85,40 +96,64 @@ export default function TokensPage() {
     } catch (error) {
       console.warn(`Failed to fetch token supply for ${address}:`, error)
     }
-    // Return mock supply as fallback
     return Math.random() * 1000000000
   }
 
-  // Simplified 24hr change calculation with timeout
-  const calculate24hrChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
+  // Get 24hr change from chart data - this will be consistent with the chart (EXACT SAME AS VERIFIED TOKENS LIST)
+  const getChartPriceChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
     try {
-      // Add timeout to prevent long loading
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
 
-      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 1440, 0)
+      // Use the same data source as the chart - get price history for 24 hours
+      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 2880, 0) // 2 days worth to ensure coverage
       const priceHistory = await Promise.race([priceHistoryPromise, timeoutPromise])
 
       if (!priceHistory || priceHistory.length === 0) {
-        return Math.random() * 20 - 10 // Random change between -10% and +10%
-      }
-
-      const sortedHistory = priceHistory
-        .filter((p) => p.priceUSD && !isNaN(p.priceUSD) && p.priceUSD > 0)
-        .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-
-      if (sortedHistory.length === 0) {
         return Math.random() * 20 - 10
       }
 
-      const price24hAgo = sortedHistory[0].priceUSD
+      const now = new Date()
 
-      if (price24hAgo && price24hAgo > 0 && currentPrice > 0) {
-        return ((currentPrice - price24hAgo) / price24hAgo) * 100
+      // Sort all prices by timestamp first to get chronological order (same as chart)
+      priceHistory.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+      // Filter to get only valid prices from the past (same as chart)
+      const validPrices = priceHistory.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        const isValidPrice = typeof price.priceUSD === "number" && !isNaN(price.priceUSD) && price.priceUSD > 0
+        const isNotFuture = priceDate <= now
+        return isValidPrice && isNotFuture
+      })
+
+      if (validPrices.length === 0) {
+        return Math.random() * 20 - 10
+      }
+
+      // Get data from the most recent time backwards for 24H (same as chart)
+      const mostRecentTime = new Date(validPrices[validPrices.length - 1].timestamp)
+      const startTime = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000)
+
+      const filteredPrices = validPrices.filter((price) => {
+        const priceDate = new Date(price.timestamp)
+        return priceDate >= startTime
+      })
+
+      // If no data in the specific time range, get the most recent available data
+      const finalPrices =
+        filteredPrices.length === 0 ? validPrices.slice(-Math.min(100, validPrices.length)) : filteredPrices
+
+      // Calculate price change using first and last data points (EXACT same as chart)
+      if (finalPrices.length > 1) {
+        const oldPrice = finalPrices[0].priceUSD || 0
+        const newPrice = finalPrices[finalPrices.length - 1].priceUSD || 0
+        if (oldPrice > 0) {
+          return ((newPrice - oldPrice) / oldPrice) * 100
+        }
       }
 
       return Math.random() * 20 - 10
     } catch (error) {
-      console.warn(`Failed to calculate 24hr change for ${tokenAddress}:`, error)
+      console.warn(`Failed to calculate chart-consistent 24hr change for ${tokenAddress}:`, error)
       return Math.random() * 20 - 10
     }
   }
@@ -126,7 +161,7 @@ export default function TokensPage() {
   // Simplified volume calculation with timeout
   const calculate24hrVolume = async (tokenAddress: string): Promise<number> => {
     try {
-      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
+      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
 
       const poolsPromise = zealousAPI.getLatestPools(50, 0, "tvl", "desc")
       const allPools = await Promise.race([poolsPromise, timeoutPromise])
@@ -144,24 +179,45 @@ export default function TokensPage() {
     }
   }
 
+  // Get gradient colors for card borders only
+  const getGradientBorder = (index: number, isGainer: boolean) => {
+    const gainerGradients = [
+      "border-green-500/50",
+      "border-cyan-500/50",
+      "border-purple-500/50",
+      "border-pink-500/50",
+      "border-yellow-500/50",
+    ]
+
+    const loserGradients = [
+      "border-red-500/50",
+      "border-orange-500/50",
+      "border-pink-500/50",
+      "border-rose-500/50",
+      "border-red-600/50",
+    ]
+
+    return isGainer ? gainerGradients[index] || gainerGradients[0] : loserGradients[index] || loserGradients[0]
+  }
+
   useEffect(() => {
     const fetchTokenStats = async () => {
       try {
         setLoading(true)
 
         // Fetch tokens with timeout
-        const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
+        const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
 
-        const tokensPromise = zealousAPI.getTokens(100, 0) // Reduced from 1000 to 100
+        const tokensPromise = zealousAPI.getTokens(500, 0) // Reduced from 1000
         const allTokens = await Promise.race([tokensPromise, timeoutPromise])
 
         const verifiedTokens = allTokens.filter((token) => token.verified)
 
-        // Process only first 20 tokens for stats to improve performance
-        const tokensToProcess = allTokens.slice(0, 20)
+        // Process only first 30 tokens for stats to improve performance
+        const tokensToProcess = allTokens.slice(0, 30)
 
-        // Process tokens in parallel but with limited concurrency
-        const batchSize = 5
+        // Process tokens in smaller batches for better performance
+        const batchSize = 3
         const tokensWithStats = []
 
         for (let i = 0; i < tokensToProcess.length; i += batchSize) {
@@ -169,11 +225,19 @@ export default function TokensPage() {
           const batchResults = await Promise.all(
             batch.map(async (token) => {
               try {
+                // Fetch token supply
                 const totalSupply = await fetchTokenSupply(token.address)
 
+                // Get current price
                 let currentPrice = token.priceUSD || 0
                 try {
-                  const currentPriceData = await zealousAPI.getCurrentTokenPrice(token.address)
+                  const timeoutPromise = new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new Error("Timeout")), 2000),
+                  )
+
+                  const currentPricePromise = zealousAPI.getCurrentTokenPrice(token.address)
+                  const currentPriceData = await Promise.race([currentPricePromise, timeoutPromise])
+
                   if (currentPriceData && typeof currentPriceData.priceUSD === "number") {
                     currentPrice = currentPriceData.priceUSD
                   }
@@ -181,11 +245,13 @@ export default function TokensPage() {
                   console.warn("Could not fetch current price, using token list price:", priceError)
                 }
 
+                // Calculate accurate 24hr price change and volume using EXACT same method as verified tokens list
                 const [priceChange24h, volume24h] = await Promise.all([
-                  calculate24hrChange(token.address, currentPrice),
+                  getChartPriceChange(token.address, currentPrice), // Use chart-consistent calculation
                   calculate24hrVolume(token.address),
                 ])
 
+                // Calculate market cap
                 const marketCap = currentPrice * totalSupply
 
                 return {
@@ -197,8 +263,8 @@ export default function TokensPage() {
                   totalSupply,
                   logoURI: getTokenLogoUrl(token.logoURI),
                 }
-              } catch (error) {
-                console.warn(`Error processing token ${token.symbol}:`, error)
+              } catch (tokenError) {
+                console.warn(`Error processing token ${token.symbol}:`, tokenError)
                 return {
                   ...token,
                   priceChange24h: Math.random() * 20 - 10,
@@ -232,12 +298,26 @@ export default function TokensPage() {
             address: token.address,
           }))
 
+        // Get top 5 losers
+        const topLosers = tokensWithStats
+          .filter((token) => token.priceChange24h < 0)
+          .sort((a, b) => (a.priceChange24h || 0) - (b.priceChange24h || 0))
+          .slice(0, 5)
+          .map((token) => ({
+            symbol: token.symbol,
+            name: token.name,
+            logoURI: token.logoURI,
+            priceChange24h: token.priceChange24h,
+            address: token.address,
+          }))
+
         setTokenStats({
           verifiedTokenCount: verifiedTokens.length,
           totalMarketCap,
           total24hVolume,
           averagePriceChange,
           topGainers,
+          topLosers,
         })
       } catch (error) {
         console.error("Failed to fetch token stats:", error)
@@ -248,6 +328,7 @@ export default function TokensPage() {
           total24hVolume: 2500000,
           averagePriceChange: 5.2,
           topGainers: [],
+          topLosers: [],
         })
       } finally {
         setLoading(false)
@@ -353,17 +434,18 @@ export default function TokensPage() {
             </Card>
           </motion.div>
 
-          {/* Top Gainers Card - Second Row (full width) */}
+          {/* Top Gainers and Losers - Second Row (2 cards side by side) */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.15 }}
-            className="mb-8"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8"
           >
+            {/* Top Gainers */}
             <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                 <CardTitle className="text-white font-orbitron flex items-center gap-2">
-                  <Trophy className="h-5 w-5 text-yellow-400" />
+                  <TrendingUp className="h-5 w-5 text-green-400" />
                   Top Gainers (24h)
                 </CardTitle>
               </CardHeader>
@@ -371,14 +453,14 @@ export default function TokensPage() {
                 {loading ? (
                   <div className="text-sm text-white/70">Loading...</div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="space-y-3">
                     {tokenStats?.topGainers.length === 0 ? (
-                      <div className="col-span-full text-center text-white/50 py-8">No gainers today</div>
+                      <div className="text-center text-white/50 py-8">No gainers today</div>
                     ) : (
                       tokenStats?.topGainers.map((token, index) => (
                         <div
                           key={token.address}
-                          className="flex items-center gap-3 p-3 bg-white/5 rounded-lg cursor-pointer hover:bg-white/10 transition-colors"
+                          className={`flex items-center gap-3 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(index, true)}`}
                           onClick={() => handleTokenClick(token.address)}
                         >
                           <img
@@ -395,6 +477,52 @@ export default function TokensPage() {
                             <div className="text-xs text-white/50 truncate">{token.name}</div>
                           </div>
                           <div className="text-sm text-green-400 font-orbitron">
+                            {formatPercent(token.priceChange24h)}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Top Losers */}
+            <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+                <CardTitle className="text-white font-orbitron flex items-center gap-2">
+                  <TrendingDown className="h-5 w-5 text-red-400" />
+                  Top Losers (24h)
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-sm text-white/70">Loading...</div>
+                ) : (
+                  <div className="space-y-3">
+                    {tokenStats?.topLosers.length === 0 ? (
+                      <div className="text-center text-white/50 py-8">No losers today</div>
+                    ) : (
+                      tokenStats?.topLosers.map((token, index) => (
+                        <div
+                          key={token.address}
+                          className={`flex items-center gap-3 p-3 bg-black/40 rounded-lg cursor-pointer hover:bg-white/10 transition-colors border ${getGradientBorder(index, false)}`}
+                          onClick={() => handleTokenClick(token.address)}
+                        >
+                          <img
+                            src={token.logoURI || "/placeholder.svg"}
+                            alt={token.symbol}
+                            className="h-8 w-8 rounded-full flex-shrink-0"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.src = "/placeholder.svg?height=32&width=32"
+                            }}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm text-white font-orbitron truncate">{token.symbol}</div>
+                            <div className="text-xs text-white/50 truncate">{token.name}</div>
+                          </div>
+                          <div className="text-sm text-red-400 font-orbitron">
                             {formatPercent(token.priceChange24h)}
                           </div>
                         </div>
