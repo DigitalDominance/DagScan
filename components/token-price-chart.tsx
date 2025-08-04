@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
@@ -53,7 +53,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const [tokenSupply, setTokenSupply] = useState<number>(0)
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState<{ x: number; panOffset: number }>({ x: 0, panOffset: 0 })
-  const [lastTouchDistance, setLastTouchDistance] = useState<number>(0)
   const [isZooming, setIsZooming] = useState(false)
   const [initialZoomData, setInitialZoomData] = useState<{
     zoom: number
@@ -71,34 +70,20 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
 
-  // Update container dimensions on mount and resize
-  useEffect(() => {
-    const updateDimensions = () => {
-      const ref = isFullscreen ? fullscreenRef.current : chartRef.current
-      if (ref) {
-        const rect = ref.getBoundingClientRect()
-        setContainerWidth(rect.width || 800)
-
-        if (isFullscreen) {
-          const viewportHeight = window.innerHeight
-          const headerHeight = 140
-          const footerHeight = 60
-          setContainerHeight(Math.max(400, viewportHeight - headerHeight - footerHeight))
-        } else {
-          setContainerHeight(280)
-        }
-      }
+  const formatTimeLabel = (dateString: string, isShortRange: boolean) => {
+    const date = new Date(dateString)
+    if (isShortRange) {
+      return date.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      })
     }
-
-    updateDimensions()
-    window.addEventListener("resize", updateDimensions)
-    window.addEventListener("orientationchange", updateDimensions)
-
-    return () => {
-      window.removeEventListener("resize", updateDimensions)
-      window.removeEventListener("orientationchange", updateDimensions)
-    }
-  }, [isFullscreen])
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    })
+  }
 
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null || isNaN(value)) {
@@ -130,20 +115,34 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     return `${sign}${value.toFixed(2)}%`
   }
 
-  const formatTimeLabel = (dateString: string, isShortRange: boolean) => {
-    const date = new Date(dateString)
-    if (isShortRange) {
-      return date.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
-      })
+  // Update container dimensions on mount and resize
+  useEffect(() => {
+    const updateDimensions = () => {
+      const ref = isFullscreen ? fullscreenRef.current : chartRef.current
+      if (ref) {
+        const rect = ref.getBoundingClientRect()
+        setContainerWidth(rect.width || 800)
+
+        if (isFullscreen) {
+          const viewportHeight = window.innerHeight
+          const headerHeight = 140
+          const footerHeight = 60
+          setContainerHeight(Math.max(400, viewportHeight - headerHeight - footerHeight))
+        } else {
+          setContainerHeight(280)
+        }
+      }
     }
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    })
-  }
+
+    updateDimensions()
+    window.addEventListener("resize", updateDimensions)
+    window.addEventListener("orientationchange", updateDimensions)
+
+    return () => {
+      window.removeEventListener("resize", updateDimensions)
+      window.removeEventListener("orientationchange", updateDimensions)
+    }
+  }, [isFullscreen])
 
   // Fetch token supply from RPC
   const fetchTokenSupply = async (address: string): Promise<number> => {
@@ -316,27 +315,307 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     setPanOffset(0)
   }, [timeRange, isFullscreen])
 
-  const handleChartHover = (event: React.MouseEvent, point?: ChartPoint) => {
-    if (isDragging || isZooming) return
+  const handleChartHover = useCallback(
+    (event: React.MouseEvent, point?: ChartPoint) => {
+      if (isDragging || isZooming) return
 
-    const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
-    if (!rect) return
+      const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
+      if (!rect) return
 
-    // Get the actual chart area (excluding fixed labels)
-    const chartAreaLeft = isFullscreen ? 80 : 60
-    const x = event.clientX - rect.left - chartAreaLeft
-    const y = event.clientY - rect.top
+      // Get the actual chart area (excluding fixed labels)
+      const chartAreaLeft = isFullscreen ? 80 : 60
+      const x = event.clientX - rect.left - chartAreaLeft
+      const y = event.clientY - rect.top
 
-    // Only show crosshair if we're within the chart area
-    if (x >= 0 && x <= rect.width - chartAreaLeft) {
-      setCrosshairPosition({ x: x + chartAreaLeft, y })
-      setShowCrosshair(true)
-    }
+      // Only show crosshair if we're within the chart area
+      if (x >= 0 && x <= rect.width - chartAreaLeft) {
+        setCrosshairPosition({ x: x + chartAreaLeft, y })
+        setShowCrosshair(true)
+      }
 
-    if (point) {
-      // Position tooltip relative to container, not viewport
+      if (point) {
+        // Position tooltip relative to container, not viewport
+        const mouseX = event.clientX - rect.left
+        const mouseY = event.clientY - rect.top
+        const containerWidth = rect.width
+        const containerHeight = rect.height
+
+        // Smart positioning within container bounds
+        let tooltipX = mouseX + 15
+        let tooltipY = mouseY - 80
+
+        // Adjust if tooltip would go off the right edge
+        if (tooltipX + 220 > containerWidth) {
+          tooltipX = mouseX - 235
+        }
+
+        // Adjust if tooltip would go off the top edge
+        if (tooltipY < 10) {
+          tooltipY = mouseY + 15
+        }
+
+        // Adjust if tooltip would go off the bottom edge
+        if (tooltipY + 120 > containerHeight) {
+          tooltipY = containerHeight - 130
+        }
+
+        // Ensure tooltip doesn't go off the left edge
+        if (tooltipX < 10) {
+          tooltipX = 10
+        }
+
+        setTooltip({
+          x: tooltipX,
+          y: tooltipY,
+          price: point.price,
+          marketCap: point.marketCap || 0,
+          timestamp: point.timestamp,
+          visible: true,
+        })
+      }
+    },
+    [isDragging, isZooming, isFullscreen],
+  )
+
+  const handleChartLeave = useCallback(() => {
+    setShowCrosshair(false)
+    closeTooltip()
+  }, [])
+
+  const closeTooltip = useCallback(() => {
+    setTooltip((prev) => ({ ...prev, visible: false }))
+  }, [])
+
+  const toggleFullscreen = useCallback(() => {
+    setIsFullscreen(!isFullscreen)
+    closeTooltip()
+    setZoomLevel(1)
+    setPanOffset(0)
+  }, [isFullscreen, closeTooltip])
+
+  const zoomIn = useCallback(() => {
+    setZoomLevel((prev) => Math.min(prev * 1.5, 10))
+  }, [])
+
+  const zoomOut = useCallback(() => {
+    setZoomLevel((prev) => Math.max(prev / 1.5, 0.5))
+  }, [])
+
+  const resetZoom = useCallback(() => {
+    setZoomLevel(1)
+    setPanOffset(0)
+  }, [])
+
+  // Handle mouse wheel zoom - optimized
+  const handleWheel = useCallback(
+    (event: React.WheelEvent) => {
+      if (!isFullscreen) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const rect = fullscreenRef.current?.getBoundingClientRect()
+      if (!rect) return
+
       const mouseX = event.clientX - rect.left
-      const mouseY = event.clientY - rect.top
+      const containerWidth = rect.width
+      const zoomPoint = mouseX / containerWidth
+
+      const oldPanOffset = panOffset
+      const oldZoomLevel = zoomLevel
+
+      let newZoomLevel: number
+      if (event.deltaY < 0) {
+        newZoomLevel = Math.min(oldZoomLevel * 1.2, 10)
+      } else {
+        newZoomLevel = Math.max(oldZoomLevel / 1.2, 0.5)
+      }
+
+      const zoomRatio = newZoomLevel / oldZoomLevel
+      const newPanOffset = oldPanOffset * zoomRatio + mouseX * (1 - zoomRatio)
+
+      setZoomLevel(newZoomLevel)
+      setPanOffset(newPanOffset)
+    },
+    [isFullscreen, panOffset, zoomLevel],
+  )
+
+  // Touch handling - completely rewritten for mobile
+  const getTouchDistance = useCallback((touches: TouchList) => {
+    if (touches.length < 2) return 0
+    const touch1 = touches[0]
+    const touch2 = touches[1]
+    return Math.sqrt(Math.pow(touch2.clientX - touch1.clientX, 2) + Math.pow(touch2.clientY - touch1.clientY, 2))
+  }, [])
+
+  const getTouchCenter = useCallback((touches: TouchList) => {
+    if (touches.length < 2) return { x: 0, y: 0 }
+    const touch1 = touches[0]
+    const touch2 = touches[1]
+    return {
+      x: (touch1.clientX + touch2.clientX) / 2,
+      y: (touch1.clientY + touch2.clientY) / 2,
+    }
+  }, [])
+
+  const handleMouseDown = useCallback(
+    (event: React.MouseEvent) => {
+      if (!isFullscreen) return
+
+      event.preventDefault()
+      setIsDragging(true)
+      setDragStart({ x: event.clientX, panOffset })
+      closeTooltip()
+    },
+    [isFullscreen, panOffset, closeTooltip],
+  )
+
+  const handleMouseMove = useCallback(
+    (event: React.MouseEvent) => {
+      if (!isFullscreen || !isDragging) return
+
+      event.preventDefault()
+      const deltaX = event.clientX - dragStart.x
+      const newPanOffset = dragStart.panOffset + deltaX
+      setPanOffset(newPanOffset)
+    },
+    [isFullscreen, isDragging, dragStart],
+  )
+
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false)
+  }, [])
+
+  // Completely rewritten touch handlers for better mobile support
+  const handleTouchStart = useCallback(
+    (event: React.TouchEvent) => {
+      if (!isFullscreen) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const touches = event.touches
+
+      if (touches.length === 2) {
+        // Two finger pinch to zoom
+        const distance = getTouchDistance(touches)
+        const center = getTouchCenter(touches)
+
+        setIsZooming(true)
+        setIsDragging(false)
+        setInitialZoomData({
+          zoom: zoomLevel,
+          pan: panOffset,
+          distance: distance,
+          center: center,
+        })
+      } else if (touches.length === 1) {
+        // Single finger pan
+        setIsDragging(true)
+        setIsZooming(false)
+        setDragStart({ x: touches[0].clientX, panOffset })
+        setInitialZoomData(null)
+        closeTooltip()
+      }
+    },
+    [isFullscreen, getTouchDistance, getTouchCenter, zoomLevel, panOffset, closeTooltip],
+  )
+
+  const handleTouchMove = useCallback(
+    (event: React.TouchEvent) => {
+      if (!isFullscreen) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const touches = event.touches
+
+      if (touches.length === 2 && isZooming && initialZoomData) {
+        // Handle pinch to zoom
+        const currentDistance = getTouchDistance(touches)
+        const currentCenter = getTouchCenter(touches)
+
+        if (initialZoomData.distance > 0 && currentDistance > 0) {
+          const scaleChange = currentDistance / initialZoomData.distance
+          let newZoomLevel = initialZoomData.zoom * scaleChange
+
+          // Clamp zoom level
+          newZoomLevel = Math.min(Math.max(newZoomLevel, 0.5), 10)
+
+          const rect = fullscreenRef.current?.getBoundingClientRect()
+          if (rect) {
+            const centerX = currentCenter.x - rect.left
+            const containerWidth = rect.width
+            const zoomPoint = centerX / containerWidth
+
+            // Calculate new pan offset based on zoom center
+            const oldZoom = zoomLevel
+            const zoomRatio = newZoomLevel / oldZoom
+            const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
+
+            setZoomLevel(newZoomLevel)
+            setPanOffset(newPanOffset)
+          }
+        }
+      } else if (touches.length === 1 && isDragging && !isZooming) {
+        // Handle single finger pan
+        const deltaX = touches[0].clientX - dragStart.x
+        const newPanOffset = dragStart.panOffset + deltaX
+        setPanOffset(newPanOffset)
+      }
+    },
+    [
+      isFullscreen,
+      isZooming,
+      initialZoomData,
+      isDragging,
+      getTouchDistance,
+      getTouchCenter,
+      zoomLevel,
+      panOffset,
+      dragStart,
+    ],
+  )
+
+  const handleTouchEnd = useCallback(
+    (event: React.TouchEvent) => {
+      if (!isFullscreen) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const touches = event.touches
+
+      if (touches.length === 0) {
+        // All fingers lifted
+        setIsDragging(false)
+        setIsZooming(false)
+        setInitialZoomData(null)
+      } else if (touches.length === 1 && isZooming) {
+        // Transition from pinch to pan
+        setIsZooming(false)
+        setIsDragging(true)
+        setDragStart({ x: touches[0].clientX, panOffset })
+        setInitialZoomData(null)
+      }
+    },
+    [isFullscreen, isZooming, panOffset],
+  )
+
+  const handleTouchTap = useCallback(
+    (event: React.TouchEvent, point: ChartPoint) => {
+      if (isZooming || isDragging) return
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const touch = event.touches[0] || event.changedTouches[0]
+      const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
+      if (!rect || !touch) return
+
+      // Position relative to container, not viewport
+      const mouseX = touch.clientX - rect.left
+      const mouseY = touch.clientY - rect.top
       const containerWidth = rect.width
       const containerHeight = rect.height
 
@@ -372,528 +651,356 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         timestamp: point.timestamp,
         visible: true,
       })
-    }
-  }
+    },
+    [isZooming, isDragging, isFullscreen],
+  )
 
-  const handleChartLeave = () => {
-    setShowCrosshair(false)
-    closeTooltip()
-  }
+  // Advanced chart component - memoized for performance
+  const AdvancedChart = useCallback(
+    ({ data, isFullscreenMode = false }: { data: ChartPoint[]; isFullscreenMode?: boolean }) => {
+      if (data.length === 0) return null
 
-  const closeTooltip = () => {
-    setTooltip((prev) => ({ ...prev, visible: false }))
-  }
+      const validData = data.filter((d) => typeof d.y === "number" && !isNaN(d.y))
+      if (validData.length === 0) return null
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen)
-    closeTooltip()
-    setZoomLevel(1)
-    setPanOffset(0)
-  }
+      const minPrice = Math.min(...validData.map((d) => d.y))
+      const maxPrice = Math.max(...validData.map((d) => d.y))
+      const priceRange = maxPrice - minPrice
+      const padding = priceRange * 0.1
 
-  const zoomIn = () => {
-    setZoomLevel((prev) => Math.min(prev * 1.5, 10))
-  }
+      const chartHeight = containerHeight
+      const containerRef = isFullscreenMode ? fullscreenRef : chartRef
+      const chartWidth = containerWidth - 20 // Account for fixed labels
 
-  const zoomOut = () => {
-    setZoomLevel((prev) => Math.max(prev / 1.5, 0.5))
-  }
+      const isShortRange = timeRange === "1H" || timeRange === "24H"
 
-  const resetZoom = () => {
-    setZoomLevel(1)
-    setPanOffset(0)
-  }
+      // Create smooth curve path
+      const createSmoothPath = (points: ChartPoint[]) => {
+        if (points.length < 2) return ""
 
-  // Handle mouse wheel zoom
-  const handleWheel = (event: React.WheelEvent) => {
-    if (!isFullscreen) return
+        const coords = points.map((point, index) => ({
+          x: (index / (points.length - 1)) * chartWidth,
+          y: chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight,
+        }))
 
-    event.preventDefault()
-    event.stopPropagation()
+        let path = `M ${coords[0].x} ${coords[0].y}`
 
-    const rect = fullscreenRef.current?.getBoundingClientRect()
-    if (!rect) return
+        for (let i = 1; i < coords.length; i++) {
+          const prev = coords[i - 1]
+          const curr = coords[i]
+          const next = coords[i + 1]
 
-    const mouseX = event.clientX - rect.left
-    const containerWidth = rect.width
-    const zoomPoint = mouseX / containerWidth
-
-    const oldPanOffset = panOffset
-    const oldZoomLevel = zoomLevel
-
-    let newZoomLevel: number
-    if (event.deltaY < 0) {
-      newZoomLevel = Math.min(oldZoomLevel * 1.2, 10)
-    } else {
-      newZoomLevel = Math.max(oldZoomLevel / 1.2, 0.5)
-    }
-
-    const zoomRatio = newZoomLevel / oldZoomLevel
-    const newPanOffset = oldPanOffset * zoomRatio + mouseX * (1 - zoomRatio)
-
-    setZoomLevel(newZoomLevel)
-    setPanOffset(newPanOffset)
-  }
-
-  // Touch handling
-  const getTouchDistance = (touches: TouchList) => {
-    if (touches.length < 2) return 0
-    const touch1 = touches[0]
-    const touch2 = touches[1]
-    return Math.sqrt(Math.pow(touch2.clientX - touch1.clientX, 2) + Math.pow(touch2.clientY - touch1.clientY, 2))
-  }
-
-  const getTouchCenter = (touches: TouchList) => {
-    if (touches.length < 2) return { x: 0, y: 0 }
-    const touch1 = touches[0]
-    const touch2 = touches[1]
-    return {
-      x: (touch1.clientX + touch2.clientX) / 2,
-      y: (touch1.clientY + touch2.clientY) / 2,
-    }
-  }
-
-  const handleMouseDown = (event: React.MouseEvent) => {
-    if (!isFullscreen) return
-
-    event.preventDefault()
-    setIsDragging(true)
-    setDragStart({ x: event.clientX, panOffset })
-    closeTooltip()
-  }
-
-  const handleMouseMove = (event: React.MouseEvent) => {
-    if (!isFullscreen || !isDragging) return
-
-    event.preventDefault()
-    const deltaX = event.clientX - dragStart.x
-    const newPanOffset = dragStart.panOffset + deltaX
-    setPanOffset(newPanOffset)
-  }
-
-  const handleMouseUp = () => {
-    setIsDragging(false)
-  }
-
-  const handleTouchStart = (event: React.TouchEvent) => {
-    if (!isFullscreen) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    if (event.touches.length === 2) {
-      const distance = getTouchDistance(event.touches)
-      const center = getTouchCenter(event.touches)
-
-      setIsZooming(true)
-      setIsDragging(false)
-      setLastTouchDistance(distance)
-
-      setInitialZoomData({
-        zoom: zoomLevel,
-        pan: panOffset,
-        distance: distance,
-        center: center,
-      })
-    } else if (event.touches.length === 1) {
-      setIsDragging(true)
-      setIsZooming(false)
-      setDragStart({ x: event.touches[0].clientX, panOffset })
-      setInitialZoomData(null)
-      closeTooltip()
-    }
-  }
-
-  const handleTouchMove = (event: React.TouchEvent) => {
-    if (!isFullscreen) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    if (event.touches.length === 2 && isZooming && initialZoomData) {
-      const currentDistance = getTouchDistance(event.touches)
-      const currentCenter = getTouchCenter(event.touches)
-
-      if (initialZoomData.distance > 0) {
-        const scaleChange = currentDistance / initialZoomData.distance
-        const newZoomLevel = Math.min(Math.max(initialZoomData.zoom * scaleChange, 0.5), 10)
-
-        const rect = fullscreenRef.current?.getBoundingClientRect()
-        if (rect) {
-          const centerX = currentCenter.x - rect.left
-          const containerWidth = rect.width
-          const zoomPoint = centerX / containerWidth
-
-          const zoomRatio = newZoomLevel / zoomLevel
-          const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
-
-          setZoomLevel(newZoomLevel)
-          setPanOffset(newPanOffset)
+          if (i === 1) {
+            const cp1x = prev.x + (curr.x - prev.x) * 0.3
+            const cp1y = prev.y
+            const cp2x = curr.x - (curr.x - prev.x) * 0.3
+            const cp2y = curr.y
+            path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
+          } else if (i === coords.length - 1) {
+            const cp1x = prev.x + (curr.x - prev.x) * 0.3
+            const cp1y = prev.y
+            const cp2x = curr.x - (curr.x - prev.x) * 0.3
+            const cp2y = curr.y
+            path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
+          } else {
+            const cp1x = prev.x + (curr.x - prev.x) * 0.3
+            const cp1y = prev.y + (curr.y - prev.y) * 0.3
+            const cp2x = curr.x - (next.x - prev.x) * 0.1
+            const cp2y = curr.y - (next.y - prev.y) * 0.1
+            path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
+          }
         }
-      }
-    } else if (event.touches.length === 1 && isDragging && !isZooming) {
-      const deltaX = event.touches[0].clientX - dragStart.x
-      const newPanOffset = dragStart.panOffset + deltaX
-      setPanOffset(newPanOffset)
-    }
-  }
 
-  const handleTouchEnd = (event: React.TouchEvent) => {
-    if (!isFullscreen) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    if (event.touches.length === 0) {
-      setLastTouchDistance(0)
-      setIsDragging(false)
-      setIsZooming(false)
-      setInitialZoomData(null)
-    } else if (event.touches.length === 1 && isZooming) {
-      setLastTouchDistance(0)
-      setIsZooming(false)
-      setIsDragging(true)
-      setDragStart({ x: event.touches[0].clientX, panOffset })
-      setInitialZoomData(null)
-    }
-  }
-
-  const handleTouchTap = (event: React.TouchEvent, point: ChartPoint) => {
-    if (isZooming || isDragging) return
-
-    event.preventDefault()
-    event.stopPropagation()
-
-    const touch = event.touches[0] || event.changedTouches[0]
-    const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
-    if (!rect || !touch) return
-
-    // Position relative to container, not viewport
-    const mouseX = touch.clientX - rect.left
-    const mouseY = touch.clientY - rect.top
-    const containerWidth = rect.width
-    const containerHeight = rect.height
-
-    // Smart positioning within container bounds
-    let tooltipX = mouseX + 15
-    let tooltipY = mouseY - 80
-
-    // Adjust if tooltip would go off the right edge
-    if (tooltipX + 220 > containerWidth) {
-      tooltipX = mouseX - 235
-    }
-
-    // Adjust if tooltip would go off the top edge
-    if (tooltipY < 10) {
-      tooltipY = mouseY + 15
-    }
-
-    // Adjust if tooltip would go off the bottom edge
-    if (tooltipY + 120 > containerHeight) {
-      tooltipY = containerHeight - 130
-    }
-
-    // Ensure tooltip doesn't go off the left edge
-    if (tooltipX < 10) {
-      tooltipX = 10
-    }
-
-    setTooltip({
-      x: tooltipX,
-      y: tooltipY,
-      price: point.price,
-      marketCap: point.marketCap || 0,
-      timestamp: point.timestamp,
-      visible: true,
-    })
-  }
-
-  // Advanced chart component
-  const AdvancedChart = ({ data, isFullscreenMode = false }: { data: ChartPoint[]; isFullscreenMode?: boolean }) => {
-    if (data.length === 0) return null
-
-    const validData = data.filter((d) => typeof d.y === "number" && !isNaN(d.y))
-    if (validData.length === 0) return null
-
-    const minPrice = Math.min(...validData.map((d) => d.y))
-    const maxPrice = Math.max(...validData.map((d) => d.y))
-    const priceRange = maxPrice - minPrice
-    const padding = priceRange * 0.1
-
-    const chartHeight = containerHeight
-    const containerRef = isFullscreenMode ? fullscreenRef : chartRef
-    const chartWidth = containerWidth - 20 // Account for fixed labels
-
-    const isShortRange = timeRange === "1H" || timeRange === "24H"
-
-    // Create smooth curve path
-    const createSmoothPath = (points: ChartPoint[]) => {
-      if (points.length < 2) return ""
-
-      const coords = points.map((point, index) => ({
-        x: (index / (points.length - 1)) * chartWidth,
-        y: chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight,
-      }))
-
-      let path = `M ${coords[0].x} ${coords[0].y}`
-
-      for (let i = 1; i < coords.length; i++) {
-        const prev = coords[i - 1]
-        const curr = coords[i]
-        const next = coords[i + 1]
-
-        if (i === 1) {
-          const cp1x = prev.x + (curr.x - prev.x) * 0.3
-          const cp1y = prev.y
-          const cp2x = curr.x - (curr.x - prev.x) * 0.3
-          const cp2y = curr.y
-          path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
-        } else if (i === coords.length - 1) {
-          const cp1x = prev.x + (curr.x - prev.x) * 0.3
-          const cp1y = prev.y
-          const cp2x = curr.x - (curr.x - prev.x) * 0.3
-          const cp2y = curr.y
-          path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
-        } else {
-          const cp1x = prev.x + (curr.x - prev.x) * 0.3
-          const cp1y = prev.y + (curr.y - prev.y) * 0.3
-          const cp2x = curr.x - (next.x - prev.x) * 0.1
-          const cp2y = curr.y - (next.y - prev.y) * 0.1
-          path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
-        }
+        return path
       }
 
-      return path
-    }
+      const pathData = createSmoothPath(validData)
+      const areaData = `${pathData} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`
 
-    const pathData = createSmoothPath(validData)
-    const areaData = `${pathData} L ${chartWidth} ${chartHeight} L 0 ${chartHeight} Z`
+      let currentTransform = "none"
+      if (isFullscreenMode) {
+        const scaleX = zoomLevel
+        const translateX = panOffset / zoomLevel
+        currentTransform = `scaleX(${scaleX}) translateX(${translateX}px)`
+      }
 
-    let currentTransform = "none"
-    if (isFullscreenMode) {
-      const scaleX = zoomLevel
-      const translateX = panOffset / zoomLevel
-      currentTransform = `scaleX(${scaleX}) translateX(${translateX}px)`
-    }
-
-    return (
-      <div
-        className={`w-full relative overflow-hidden ${isFullscreenMode ? "h-full" : ""}`}
-        ref={containerRef}
-        onWheel={handleWheel}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        onTouchStart={handleTouchStart}
-        onTouchMove={handleTouchMove}
-        onTouchEnd={handleTouchEnd}
-        style={{
-          touchAction: "none",
-          cursor: isFullscreenMode ? (isDragging ? "grabbing" : "grab") : "default",
-          userSelect: "none",
-          height: isFullscreenMode ? `${containerHeight}px` : "280px",
-        }}
-      >
+      return (
         <div
-          className="h-full w-full relative"
+          className={`w-full relative overflow-hidden ${isFullscreenMode ? "h-full" : ""}`}
+          ref={containerRef}
+          onWheel={handleWheel}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
           style={{
-            transform: currentTransform,
-            transformOrigin: "left center",
+            touchAction: "none",
+            cursor: isFullscreenMode ? (isDragging ? "grabbing" : "grab") : "default",
+            userSelect: "none",
+            height: isFullscreenMode ? `${containerHeight}px` : "280px",
+            willChange: isFullscreenMode ? "transform" : "auto",
+            zIndex: 1,
           }}
-          onMouseMove={(e) => handleChartHover(e)}
-          onMouseLeave={handleChartLeave}
         >
-          <svg
-            width="100%"
-            height="100%"
-            viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-            className="overflow-visible"
-            preserveAspectRatio="none"
+          <div
+            className="h-full w-full relative"
+            style={{
+              transform: currentTransform,
+              transformOrigin: "left center",
+              willChange: isFullscreenMode ? "transform" : "auto",
+              zIndex: 2,
+            }}
+            onMouseMove={handleChartHover}
+            onMouseLeave={handleChartLeave}
           >
-            <defs>
-              <linearGradient id="priceGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                <stop offset="0%" stopColor="#8B5CF6" />
-                <stop offset="50%" stopColor="#EC4899" />
-                <stop offset="100%" stopColor="#3B82F6" />
-              </linearGradient>
-              <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.3" />
-                <stop offset="33%" stopColor="#EC4899" stopOpacity="0.2" />
-                <stop offset="66%" stopColor="#3B82F6" stopOpacity="0.15" />
-                <stop offset="100%" stopColor="#1E1B4B" stopOpacity="0.05" />
-              </linearGradient>
-              <filter id="glow">
-                <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                <feMerge>
-                  <feMergeNode in="coloredBlur" />
-                  <feMergeNode in="SourceGraphic" />
-                </feMerge>
-              </filter>
-            </defs>
-
-            {/* Enhanced grid */}
-            {[0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio) => (
-              <line
-                key={ratio}
-                x1="0"
-                y1={chartHeight * ratio}
-                x2={chartWidth}
-                y2={chartHeight * ratio}
-                stroke="rgba(255,255,255,0.08)"
-                strokeDasharray="1,3"
-                strokeWidth="0.5"
-              />
-            ))}
-
-            {/* Vertical grid lines */}
-            {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
-              <line
-                key={`v-${ratio}`}
-                x1={chartWidth * ratio}
-                y1="0"
-                x2={chartWidth * ratio}
-                y2={chartHeight}
-                stroke="rgba(255,255,255,0.05)"
-                strokeDasharray="1,3"
-                strokeWidth="0.5"
-              />
-            ))}
-
-            {/* Area fill */}
-            <path d={areaData} fill="url(#areaGradient)" />
-
-            {/* Main price line with glow effect */}
-            <path
-              d={pathData}
-              fill="none"
-              stroke="url(#priceGradient)"
-              strokeWidth={isFullscreenMode ? "2" : "1.5"}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              filter="url(#glow)"
-            />
-
-            {/* Data points with improved mobile interaction */}
-            {validData.map((point, index) => {
-              const x = (index / (validData.length - 1)) * chartWidth
-              const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
-              return (
-                <circle
-                  key={index}
-                  cx={x}
-                  cy={y}
-                  r={isFullscreenMode ? "6" : "4"}
-                  fill="url(#priceGradient)"
-                  stroke="rgba(0,0,0,0.6)"
-                  strokeWidth="1"
-                  className="opacity-0 hover:opacity-100 transition-all duration-200 cursor-pointer"
-                  onClick={(e) => handleChartHover(e, point)}
-                  onMouseEnter={(e) => handleChartHover(e, point)}
-                  onMouseLeave={() => closeTooltip()}
-                  onTouchStart={(e) => handleTouchTap(e, point)}
-                  filter="url(#glow)"
-                  style={{ touchAction: "none" }}
-                />
-              )
-            })}
-
-            {/* Crosshair */}
-            {showCrosshair && isFullscreenMode && (
-              <g className="pointer-events-none">
-                <line
-                  x1={crosshairPosition.x}
-                  y1="0"
-                  x2={crosshairPosition.x}
-                  y2={chartHeight}
-                  stroke="rgba(139, 92, 246, 0.5)"
-                  strokeWidth="1"
-                  strokeDasharray="2,2"
-                />
-                <line
-                  x1="0"
-                  y1={crosshairPosition.y}
-                  x2={chartWidth}
-                  y2={crosshairPosition.y}
-                  stroke="rgba(139, 92, 246, 0.5)"
-                  strokeWidth="1"
-                  strokeDasharray="2,2"
-                />
-              </g>
-            )}
-          </svg>
-
-          {/* Enhanced X-axis labels */}
-          <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-white/60 font-mono mt-2 px-2 pointer-events-none select-none">
-            {validData.length > 0 && (
-              <>
-                <span className="bg-black/50 px-2 py-1 rounded text-xs">
-                  {formatTimeLabel(validData[0].timestamp, isShortRange)}
-                </span>
-                {validData.length > 2 && (
-                  <span className="bg-black/50 px-2 py-1 rounded text-xs">
-                    {formatTimeLabel(validData[Math.floor(validData.length / 2)].timestamp, isShortRange)}
-                  </span>
-                )}
-                <span className="bg-black/50 px-2 py-1 rounded text-xs">
-                  {formatTimeLabel(validData[validData.length - 1].timestamp, isShortRange)}
-                </span>
-              </>
-            )}
-          </div>
-
-          {/* Enhanced tooltip with better mobile positioning */}
-          {tooltip.visible && (
-            <div
-              className="pointer-events-none select-none z-50"
-              style={{
-                position: "absolute",
-                left: tooltip.x,
-                top: tooltip.y,
-                zIndex: 9999,
-              }}
+            <svg
+              width="100%"
+              height="100%"
+              viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+              className="overflow-visible"
+              preserveAspectRatio="none"
+              style={{ willChange: "auto", zIndex: 3 }}
             >
-              <div className="bg-black/95 border border-purple-500/50 rounded-xl p-4 text-white text-sm backdrop-blur-xl max-w-xs shadow-2xl">
-                <button
-                  onClick={closeTooltip}
-                  className="absolute top-2 right-2 text-white/50 hover:text-white pointer-events-auto transition-colors z-10"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-                <div className="space-y-2">
-                  <div className="text-purple-400 font-bold text-base">{formatCurrency(tooltip.price)}</div>
-                  <div className="text-blue-400 text-sm">Market Cap: {formatCurrency(tooltip.marketCap)}</div>
-                  <div className="text-white/70 text-xs font-mono">
-                    {timeRange === "1H" || timeRange === "24H"
-                      ? new Date(tooltip.timestamp).toLocaleString()
-                      : new Date(tooltip.timestamp).toLocaleDateString()}
+              <defs>
+                <linearGradient id="priceGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#8B5CF6" />
+                  <stop offset="50%" stopColor="#EC4899" />
+                  <stop offset="100%" stopColor="#3B82F6" />
+                </linearGradient>
+                <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <stop offset="0%" stopColor="#8B5CF6" stopOpacity="0.3" />
+                  <stop offset="33%" stopColor="#EC4899" stopOpacity="0.2" />
+                  <stop offset="66%" stopColor="#3B82F6" stopOpacity="0.15" />
+                  <stop offset="100%" stopColor="#1E1B4B" stopOpacity="0.05" />
+                </linearGradient>
+                <filter id="glow">
+                  <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                  <feMerge>
+                    <feMergeNode in="coloredBlur" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
+              </defs>
+
+              {/* Enhanced grid */}
+              {[0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio) => (
+                <line
+                  key={ratio}
+                  x1="0"
+                  y1={chartHeight * ratio}
+                  x2={chartWidth}
+                  y2={chartHeight * ratio}
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeDasharray="1,3"
+                  strokeWidth="0.5"
+                />
+              ))}
+
+              {/* Vertical grid lines */}
+              {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
+                <line
+                  key={`v-${ratio}`}
+                  x1={chartWidth * ratio}
+                  y1="0"
+                  x2={chartWidth * ratio}
+                  y2={chartHeight}
+                  stroke="rgba(255,255,255,0.05)"
+                  strokeDasharray="1,3"
+                  strokeWidth="0.5"
+                />
+              ))}
+
+              {/* Area fill */}
+              <path d={areaData} fill="url(#areaGradient)" />
+
+              {/* Main price line with glow effect */}
+              <path
+                d={pathData}
+                fill="none"
+                stroke="url(#priceGradient)"
+                strokeWidth={isFullscreenMode ? "2" : "1.5"}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                filter="url(#glow)"
+              />
+
+              {/* Data points with improved mobile interaction */}
+              {validData.map((point, index) => {
+                const x = (index / (validData.length - 1)) * chartWidth
+                const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
+                return (
+                  <circle
+                    key={index}
+                    cx={x}
+                    cy={y}
+                    r={isFullscreenMode ? "6" : "4"}
+                    fill="url(#priceGradient)"
+                    stroke="rgba(0,0,0,0.6)"
+                    strokeWidth="1"
+                    className="opacity-0 hover:opacity-100 transition-all duration-200 cursor-pointer"
+                    onClick={(e) => handleChartHover(e, point)}
+                    onMouseEnter={(e) => handleChartHover(e, point)}
+                    onMouseLeave={closeTooltip}
+                    onTouchStart={(e) => handleTouchTap(e, point)}
+                    filter="url(#glow)"
+                    style={{ touchAction: "none" }}
+                  />
+                )
+              })}
+
+              {/* Crosshair */}
+              {showCrosshair && isFullscreenMode && (
+                <g className="pointer-events-none">
+                  <line
+                    x1={crosshairPosition.x}
+                    y1="0"
+                    x2={crosshairPosition.x}
+                    y2={chartHeight}
+                    stroke="rgba(139, 92, 246, 0.5)"
+                    strokeWidth="1"
+                    strokeDasharray="2,2"
+                  />
+                  <line
+                    x1="0"
+                    y1={crosshairPosition.y}
+                    x2={chartWidth}
+                    y2={crosshairPosition.y}
+                    stroke="rgba(139, 92, 246, 0.5)"
+                    strokeWidth="1"
+                    strokeDasharray="2,2"
+                  />
+                </g>
+              )}
+            </svg>
+
+            {/* Enhanced X-axis labels */}
+            <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-white/60 font-mono mt-2 px-2 pointer-events-none select-none">
+              {validData.length > 0 && (
+                <>
+                  <span className="bg-black/50 px-2 py-1 rounded text-xs">
+                    {formatTimeLabel(validData[0].timestamp, isShortRange)}
+                  </span>
+                  {validData.length > 2 && (
+                    <span className="bg-black/50 px-2 py-1 rounded text-xs">
+                      {formatTimeLabel(validData[Math.floor(validData.length / 2)].timestamp, isShortRange)}
+                    </span>
+                  )}
+                  <span className="bg-black/50 px-2 py-1 rounded text-xs">
+                    {formatTimeLabel(validData[validData.length - 1].timestamp, isShortRange)}
+                  </span>
+                </>
+              )}
+            </div>
+
+            {/* Enhanced tooltip with better mobile positioning */}
+            {tooltip.visible && (
+              <div
+                className="pointer-events-none select-none"
+                style={{
+                  position: "absolute",
+                  left: tooltip.x,
+                  top: tooltip.y,
+                  zIndex: 9999,
+                }}
+              >
+                <div className="bg-black/95 border border-purple-500/50 rounded-xl p-4 text-white text-sm backdrop-blur-xl max-w-xs shadow-2xl">
+                  <button
+                    onClick={closeTooltip}
+                    className="absolute top-2 right-2 text-white/50 hover:text-white pointer-events-auto transition-colors z-10"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                  <div className="space-y-2">
+                    <div className="text-purple-400 font-bold text-base">{formatCurrency(tooltip.price)}</div>
+                    <div className="text-blue-400 text-sm">Market Cap: {formatCurrency(tooltip.marketCap)}</div>
+                    <div className="text-white/70 text-xs font-mono">
+                      {timeRange === "1H" || timeRange === "24H"
+                        ? new Date(tooltip.timestamp).toLocaleString()
+                        : new Date(tooltip.timestamp).toLocaleDateString()}
+                    </div>
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Enhanced zoom controls for fullscreen - Desktop only */}
+          {isFullscreenMode && (
+            <div className="hidden md:flex absolute top-4 right-4 flex-col gap-2 bg-black/90 rounded-lg p-2 border border-white/30 backdrop-blur-sm z-[10000]">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  zoomIn()
+                }}
+                className="text-white hover:bg-white/20 p-1 h-10 w-10"
+              >
+                <ZoomIn className="h-5 w-5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  zoomOut()
+                }}
+                className="text-white hover:bg-white/20 p-1 h-10 w-10"
+              >
+                <ZoomOut className="h-5 w-5" />
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  resetZoom()
+                }}
+                className="text-white hover:bg-white/20 p-1 h-10 w-10"
+              >
+                <Move className="h-5 w-5" />
+              </Button>
+              {zoomLevel !== 1 && (
+                <div className="text-xs text-white/70 text-center font-mono bg-black/50 px-2 py-1 rounded">
+                  {zoomLevel.toFixed(1)}x
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {/* Enhanced zoom controls for fullscreen */}
-        {isFullscreenMode && (
-          <div className="absolute top-4 right-4 flex flex-col gap-2 bg-black/80 rounded-lg p-2 border border-white/20">
-            <Button size="sm" variant="ghost" onClick={zoomIn} className="text-white hover:bg-white/10 p-1 h-8 w-8">
-              <ZoomIn className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={zoomOut} className="text-white hover:bg-white/10 p-1 h-8 w-8">
-              <ZoomOut className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="ghost" onClick={resetZoom} className="text-white hover:bg-white/10 p-1 h-8 w-8">
-              <Move className="h-4 w-4" />
-            </Button>
-            {zoomLevel !== 1 && (
-              <div className="text-xs text-white/70 text-center font-mono">{zoomLevel.toFixed(1)}x</div>
-            )}
-          </div>
-        )}
-      </div>
-    )
-  }
+      )
+    },
+    [
+      containerHeight,
+      containerWidth,
+      timeRange,
+      zoomLevel,
+      panOffset,
+      handleWheel,
+      handleMouseDown,
+      handleMouseMove,
+      handleMouseUp,
+      handleTouchStart,
+      handleTouchMove,
+      handleTouchEnd,
+      isDragging,
+      isFullscreen,
+      showCrosshair,
+      crosshairPosition,
+      tooltip,
+      closeTooltip,
+      initialZoomData,
+      zoomIn,
+      zoomOut,
+      resetZoom,
+    ],
+  )
 
   if (loading) {
     return (
@@ -936,7 +1043,10 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       >
         <div className="h-full flex flex-col">
           {/* Sleek header */}
-          <div className="flex-shrink-0 bg-black/50 border-b border-purple-500/30 backdrop-blur-xl">
+          <div
+            className="flex-shrink-0 bg-black/50 border-b border-purple-500/30 backdrop-blur-xl"
+            style={{ zIndex: 1000 }}
+          >
             <div className="flex flex-col gap-3 p-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-bold text-white truncate flex-1 mr-4">{tokenSymbol} Advanced Chart</h2>
@@ -977,12 +1087,15 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           </div>
 
           {/* Chart area */}
-          <div className="flex-1 overflow-hidden px-4 py-2">
+          <div className="flex-1 overflow-hidden px-4 py-2" style={{ zIndex: 1 }}>
             <AdvancedChart data={priceData} isFullscreenMode={true} />
           </div>
 
           {/* Enhanced footer */}
-          <div className="flex-shrink-0 bg-black/50 border-t border-purple-500/30 backdrop-blur-xl p-3 text-center">
+          <div
+            className="flex-shrink-0 bg-black/50 border-t border-purple-500/30 backdrop-blur-xl p-3 text-center"
+            style={{ zIndex: 1000 }}
+          >
             <div className="text-xs text-white/60">
               <div className="hidden sm:block">
                 🖱️ Scroll to zoom • 👆 Pinch to zoom • 🖐️ Drag to pan • 🎯 Hover for crosshair
