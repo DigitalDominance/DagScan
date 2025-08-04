@@ -497,7 +497,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const touches = event.touches
 
       if (touches.length === 2) {
-        // Two finger pinch to zoom
+        // Exactly two finger pinch to zoom
         const distance = getTouchDistance(touches)
         const center = getTouchCenter(touches)
 
@@ -509,16 +509,24 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           distance: distance,
           center: center,
         })
-      } else if (touches.length === 1) {
-        // Single finger pan
-        setIsDragging(true)
-        setIsZooming(false)
-        setDragStart({ x: touches[0].clientX, panOffset })
-        setInitialZoomData(null)
         closeTooltip()
+      } else if (touches.length === 1) {
+        // Single finger pan only if not zooming
+        if (!isZooming) {
+          setIsDragging(true)
+          setIsZooming(false)
+          setDragStart({ x: touches[0].clientX, panOffset })
+          setInitialZoomData(null)
+          closeTooltip()
+        }
+      } else {
+        // More than 2 fingers - reset everything
+        setIsDragging(false)
+        setIsZooming(false)
+        setInitialZoomData(null)
       }
     },
-    [isFullscreen, getTouchDistance, getTouchCenter, zoomLevel, panOffset, closeTooltip],
+    [isFullscreen, getTouchDistance, getTouchCenter, zoomLevel, panOffset, closeTooltip, isZooming],
   )
 
   const handleTouchMove = useCallback(
@@ -531,37 +539,48 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const touches = event.touches
 
       if (touches.length === 2 && isZooming && initialZoomData) {
-        // Handle pinch to zoom
+        // Handle pinch to zoom - throttled for performance
         const currentDistance = getTouchDistance(touches)
         const currentCenter = getTouchCenter(touches)
 
-        if (initialZoomData.distance > 0 && currentDistance > 0) {
+        if (initialZoomData.distance > 10 && currentDistance > 10) {
           const scaleChange = currentDistance / initialZoomData.distance
           let newZoomLevel = initialZoomData.zoom * scaleChange
 
           // Clamp zoom level
           newZoomLevel = Math.min(Math.max(newZoomLevel, 0.5), 10)
 
-          const rect = fullscreenRef.current?.getBoundingClientRect()
-          if (rect) {
-            const centerX = currentCenter.x - rect.left
-            const containerWidth = rect.width
-            const zoomPoint = centerX / containerWidth
+          // Only update if change is significant enough (reduces lag)
+          if (Math.abs(newZoomLevel - zoomLevel) > 0.01) {
+            const rect = fullscreenRef.current?.getBoundingClientRect()
+            if (rect) {
+              const centerX = currentCenter.x - rect.left
+              const containerWidth = rect.width
+              const zoomPoint = centerX / containerWidth
 
-            // Calculate new pan offset based on zoom center
-            const oldZoom = zoomLevel
-            const zoomRatio = newZoomLevel / oldZoom
-            const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
+              // Simplified pan calculation for better performance
+              const zoomRatio = newZoomLevel / zoomLevel
+              const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
 
-            setZoomLevel(newZoomLevel)
-            setPanOffset(newPanOffset)
+              // Use requestAnimationFrame for smooth updates
+              requestAnimationFrame(() => {
+                setZoomLevel(newZoomLevel)
+                setPanOffset(newPanOffset)
+              })
+            }
           }
         }
       } else if (touches.length === 1 && isDragging && !isZooming) {
-        // Handle single finger pan
+        // Handle single finger pan - throttled
         const deltaX = touches[0].clientX - dragStart.x
         const newPanOffset = dragStart.panOffset + deltaX
-        setPanOffset(newPanOffset)
+
+        // Only update if change is significant enough
+        if (Math.abs(newPanOffset - panOffset) > 2) {
+          requestAnimationFrame(() => {
+            setPanOffset(newPanOffset)
+          })
+        }
       }
     },
     [
@@ -587,7 +606,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const touches = event.touches
 
       if (touches.length === 0) {
-        // All fingers lifted
+        // All fingers lifted - reset everything
         setIsDragging(false)
         setIsZooming(false)
         setInitialZoomData(null)
@@ -596,6 +615,11 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         setIsZooming(false)
         setIsDragging(true)
         setDragStart({ x: touches[0].clientX, panOffset })
+        setInitialZoomData(null)
+      } else if (touches.length > 2) {
+        // Too many fingers - reset
+        setIsDragging(false)
+        setIsZooming(false)
         setInitialZoomData(null)
       }
     },
@@ -743,6 +767,10 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             height: isFullscreenMode ? `${containerHeight}px` : "280px",
             willChange: isFullscreenMode ? "transform" : "auto",
             zIndex: 1,
+            // Add performance optimizations
+            transform: "translateZ(0)", // Force hardware acceleration
+            backfaceVisibility: "hidden",
+            perspective: 1000,
           }}
         >
           <div
@@ -752,6 +780,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               transformOrigin: "left center",
               willChange: isFullscreenMode ? "transform" : "auto",
               zIndex: 2,
+              // Add performance optimizations
+              backfaceVisibility: "hidden",
+              transform3d: "translate3d(0,0,0)", // Force GPU acceleration
             }}
             onMouseMove={handleChartHover}
             onMouseLeave={handleChartLeave}
