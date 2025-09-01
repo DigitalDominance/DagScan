@@ -8,10 +8,12 @@ import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, BarChart3, X, Maximize2, Minimize2, ZoomIn, ZoomOut, Move } from "lucide-react"
 import { ZealousAPI } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
+import { LFGAPI } from "@/lib/lfg-api"
 
 interface TokenPriceChartProps {
   tokenAddress: string
   tokenSymbol: string
+  apiType?: "zealous" | "kasplex" | "lfg"
 }
 
 interface ChartPoint {
@@ -31,7 +33,7 @@ interface TooltipData {
   visible: boolean
 }
 
-export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPriceChartProps) {
+export default function TokenPriceChart({ tokenAddress, tokenSymbol, apiType = "zealous" }: TokenPriceChartProps) {
   const [priceData, setPriceData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -69,6 +71,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
 
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
+  const lfgAPI = new LFGAPI()
 
   const formatTimeLabel = (dateString: string, isShortRange: boolean) => {
     const date = new Date(dateString)
@@ -115,7 +118,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     return `${sign}${value.toFixed(2)}%`
   }
 
-  // Update container dimensions on mount and resize
   useEffect(() => {
     const updateDimensions = () => {
       const ref = isFullscreen ? fullscreenRef.current : chartRef.current
@@ -144,7 +146,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     }
   }, [isFullscreen])
 
-  // Fetch token supply from RPC
   const fetchTokenSupply = async (address: string): Promise<number> => {
     try {
       const totalSupplyMethodId = "0x18160ddd"
@@ -183,15 +184,29 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         setLoading(true)
         setError(null)
 
-        try {
-          const currentPriceData = await zealousAPI.getCurrentTokenPrice(tokenAddress)
-          if (currentPriceData && typeof currentPriceData.priceUSD === "number") {
-            setCurrentPrice(currentPriceData.priceUSD)
-            const calculatedMarketCap = currentPriceData.priceUSD * tokenSupply
-            setMarketCap(calculatedMarketCap)
+        if (apiType === "lfg") {
+          const lfgData = await lfgAPI.getTokenHistory(tokenAddress)
+          if (lfgData && lfgData.points && lfgData.points.length > 0) {
+            const prices = lfgData.points.map((point: any) => ({
+              timestamp: new Date(point.t).toISOString(),
+              priceUSD: point.price || 0,
+            }))
+
+            const mostRecentPrice = prices[prices.length - 1]?.priceUSD || 0
+            setCurrentPrice(mostRecentPrice)
+            setMarketCap(mostRecentPrice * tokenSupply)
           }
-        } catch (currentPriceError) {
-          console.warn("Could not fetch current price:", currentPriceError)
+        } else {
+          try {
+            const currentPriceData = await zealousAPI.getCurrentTokenPrice(tokenAddress)
+            if (currentPriceData && typeof currentPriceData.priceUSD === "number") {
+              setCurrentPrice(currentPriceData.priceUSD)
+              const calculatedMarketCap = currentPriceData.priceUSD * tokenSupply
+              setMarketCap(calculatedMarketCap)
+            }
+          } catch (currentPriceError) {
+            console.warn("Could not fetch current price:", currentPriceError)
+          }
         }
 
         const now = new Date()
@@ -217,7 +232,22 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             limit = 10000
         }
 
-        const prices = await zealousAPI.getTokenPrice(tokenAddress, limit, 0)
+        let prices: any[] = []
+        if (apiType === "lfg") {
+          const lfgData = await lfgAPI.getTokenHistory(tokenAddress)
+          if (lfgData && lfgData.points && lfgData.points.length > 0) {
+            prices = lfgData.points.map((point: any) => ({
+              timestamp: new Date(point.t).toISOString(),
+              priceUSD: point.price || 0,
+            }))
+
+            const mostRecentPrice = prices[prices.length - 1]?.priceUSD || 0
+            setCurrentPrice(mostRecentPrice)
+            setMarketCap(mostRecentPrice * tokenSupply)
+          }
+        } else {
+          prices = await zealousAPI.getTokenPrice(tokenAddress, limit, 0)
+        }
 
         if (!prices || prices.length === 0) {
           setError("No price data available")
@@ -308,7 +338,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     if (tokenSupply > 0) {
       fetchPriceData()
     }
-  }, [tokenAddress, timeRange, tokenSupply])
+  }, [tokenAddress, timeRange, tokenSupply, apiType])
 
   useEffect(() => {
     setZoomLevel(1)
@@ -322,44 +352,36 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
       if (!rect) return
 
-      // Get the actual chart area (excluding fixed labels)
       const chartAreaLeft = isFullscreen ? 80 : 60
       const x = event.clientX - rect.left - chartAreaLeft
       const y = event.clientY - rect.top
 
-      // Only show crosshair if we're within the chart area
       if (x >= 0 && x <= rect.width - chartAreaLeft) {
         setCrosshairPosition({ x: x + chartAreaLeft, y })
         setShowCrosshair(true)
       }
 
       if (point) {
-        // Position tooltip relative to container, not viewport
         const mouseX = event.clientX - rect.left
         const mouseY = event.clientY - rect.top
         const containerWidth = rect.width
         const containerHeight = rect.height
 
-        // Smart positioning within container bounds
         let tooltipX = mouseX + 15
         let tooltipY = mouseY - 80
 
-        // Adjust if tooltip would go off the right edge
         if (tooltipX + 220 > containerWidth) {
           tooltipX = mouseX - 235
         }
 
-        // Adjust if tooltip would go off the top edge
         if (tooltipY < 10) {
           tooltipY = mouseY + 15
         }
 
-        // Adjust if tooltip would go off the bottom edge
         if (tooltipY + 120 > containerHeight) {
           tooltipY = containerHeight - 130
         }
 
-        // Ensure tooltip doesn't go off the left edge
         if (tooltipX < 10) {
           tooltipX = 10
         }
@@ -406,7 +428,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     setPanOffset(0)
   }, [])
 
-  // Handle mouse wheel zoom - optimized
   const handleWheel = useCallback(
     (event: React.WheelEvent) => {
       if (!isFullscreen) return
@@ -440,7 +461,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     [isFullscreen, panOffset, zoomLevel],
   )
 
-  // Touch handling - completely rewritten for mobile
   const getTouchDistance = useCallback((touches: TouchList) => {
     if (touches.length < 2) return 0
     const touch1 = touches[0]
@@ -486,7 +506,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     setIsDragging(false)
   }, [])
 
-  // Completely rewritten touch handlers for better mobile support
   const handleTouchStart = useCallback(
     (event: React.TouchEvent) => {
       if (!isFullscreen) return
@@ -497,7 +516,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const touches = event.touches
 
       if (touches.length === 2) {
-        // Exactly two finger pinch to zoom
         const distance = getTouchDistance(touches)
         const center = getTouchCenter(touches)
 
@@ -511,7 +529,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         })
         closeTooltip()
       } else if (touches.length === 1) {
-        // Single finger pan only if not zooming
         if (!isZooming) {
           setIsDragging(true)
           setIsZooming(false)
@@ -520,7 +537,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           closeTooltip()
         }
       } else {
-        // More than 2 fingers - reset everything
         setIsDragging(false)
         setIsZooming(false)
         setInitialZoomData(null)
@@ -539,7 +555,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const touches = event.touches
 
       if (touches.length === 2 && isZooming && initialZoomData) {
-        // Handle pinch to zoom - throttled for performance
         const currentDistance = getTouchDistance(touches)
         const currentCenter = getTouchCenter(touches)
 
@@ -547,10 +562,8 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           const scaleChange = currentDistance / initialZoomData.distance
           let newZoomLevel = initialZoomData.zoom * scaleChange
 
-          // Clamp zoom level
           newZoomLevel = Math.min(Math.max(newZoomLevel, 0.5), 10)
 
-          // Only update if change is significant enough (reduces lag)
           if (Math.abs(newZoomLevel - zoomLevel) > 0.01) {
             const rect = fullscreenRef.current?.getBoundingClientRect()
             if (rect) {
@@ -558,11 +571,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               const containerWidth = rect.width
               const zoomPoint = centerX / containerWidth
 
-              // Simplified pan calculation for better performance
               const zoomRatio = newZoomLevel / zoomLevel
               const newPanOffset = panOffset * zoomRatio + centerX * (1 - zoomRatio)
 
-              // Use requestAnimationFrame for smooth updates
               requestAnimationFrame(() => {
                 setZoomLevel(newZoomLevel)
                 setPanOffset(newPanOffset)
@@ -571,11 +582,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
           }
         }
       } else if (touches.length === 1 && isDragging && !isZooming) {
-        // Handle single finger pan - throttled
         const deltaX = touches[0].clientX - dragStart.x
         const newPanOffset = dragStart.panOffset + deltaX
 
-        // Only update if change is significant enough
         if (Math.abs(newPanOffset - panOffset) > 2) {
           requestAnimationFrame(() => {
             setPanOffset(newPanOffset)
@@ -606,18 +615,15 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const touches = event.touches
 
       if (touches.length === 0) {
-        // All fingers lifted - reset everything
         setIsDragging(false)
         setIsZooming(false)
         setInitialZoomData(null)
       } else if (touches.length === 1 && isZooming) {
-        // Transition from pinch to pan
         setIsZooming(false)
         setIsDragging(true)
         setDragStart({ x: touches[0].clientX, panOffset })
         setInitialZoomData(null)
       } else if (touches.length > 2) {
-        // Too many fingers - reset
         setIsDragging(false)
         setIsZooming(false)
         setInitialZoomData(null)
@@ -637,32 +643,21 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
       const rect = (isFullscreen ? fullscreenRef.current : chartRef.current)?.getBoundingClientRect()
       if (!rect || !touch) return
 
-      // Position relative to container, not viewport
-      const mouseX = touch.clientX - rect.left
-      const mouseY = touch.clientY - rect.top
-      const containerWidth = rect.width
-      const containerHeight = rect.height
+      let tooltipX = touch.clientX - rect.left + 15
+      let tooltipY = touch.clientY - rect.top - 80
 
-      // Smart positioning within container bounds
-      let tooltipX = mouseX + 15
-      let tooltipY = mouseY - 80
-
-      // Adjust if tooltip would go off the right edge
-      if (tooltipX + 220 > containerWidth) {
-        tooltipX = mouseX - 235
+      if (tooltipX + 220 > rect.width) {
+        tooltipX = touch.clientX - rect.left - 235
       }
 
-      // Adjust if tooltip would go off the top edge
       if (tooltipY < 10) {
-        tooltipY = mouseY + 15
+        tooltipY = touch.clientY - rect.top + 15
       }
 
-      // Adjust if tooltip would go off the bottom edge
-      if (tooltipY + 120 > containerHeight) {
-        tooltipY = containerHeight - 130
+      if (tooltipY + 120 > rect.height) {
+        tooltipY = rect.height - rect.top - 130
       }
 
-      // Ensure tooltip doesn't go off the left edge
       if (tooltipX < 10) {
         tooltipX = 10
       }
@@ -679,7 +674,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     [isZooming, isDragging, isFullscreen],
   )
 
-  // Advanced chart component - memoized for performance
   const AdvancedChart = useCallback(
     ({ data, isFullscreenMode = false }: { data: ChartPoint[]; isFullscreenMode?: boolean }) => {
       if (data.length === 0) return null
@@ -694,11 +688,10 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
 
       const chartHeight = containerHeight
       const containerRef = isFullscreenMode ? fullscreenRef : chartRef
-      const chartWidth = containerWidth - 20 // Account for fixed labels
+      const chartWidth = containerWidth - 20
 
       const isShortRange = timeRange === "1H" || timeRange === "24H"
 
-      // Create smooth curve path
       const createSmoothPath = (points: ChartPoint[]) => {
         if (points.length < 2) return ""
 
@@ -722,9 +715,9 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
           } else if (i === coords.length - 1) {
             const cp1x = prev.x + (curr.x - prev.x) * 0.3
-            const cp1y = prev.y
+            const cp1y = prev.y + (curr.y - prev.y) * 0.3
             const cp2x = curr.x - (curr.x - prev.x) * 0.3
-            const cp2y = curr.y
+            const cp2y = curr.y - (curr.y - prev.y) * 0.3
             path += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${curr.x} ${curr.y}`
           } else {
             const cp1x = prev.x + (curr.x - prev.x) * 0.3
@@ -767,8 +760,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             height: isFullscreenMode ? `${containerHeight}px` : "280px",
             willChange: isFullscreenMode ? "transform" : "auto",
             zIndex: 1,
-            // Add performance optimizations
-            transform: "translateZ(0)", // Force hardware acceleration
+            transform: "translateZ(0)",
             backfaceVisibility: "hidden",
             perspective: 1000,
           }}
@@ -780,9 +772,8 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               transformOrigin: "left center",
               willChange: isFullscreenMode ? "transform" : "auto",
               zIndex: 2,
-              // Add performance optimizations
               backfaceVisibility: "hidden",
-              transform3d: "translate3d(0,0,0)", // Force GPU acceleration
+              transform3d: "translate3d(0,0,0)",
             }}
             onMouseMove={handleChartHover}
             onMouseLeave={handleChartLeave}
@@ -816,7 +807,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 </filter>
               </defs>
 
-              {/* Enhanced grid */}
               {[0, 0.2, 0.4, 0.6, 0.8, 1].map((ratio) => (
                 <line
                   key={ratio}
@@ -830,7 +820,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 />
               ))}
 
-              {/* Vertical grid lines */}
               {[0, 0.25, 0.5, 0.75, 1].map((ratio) => (
                 <line
                   key={`v-${ratio}`}
@@ -844,10 +833,8 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 />
               ))}
 
-              {/* Area fill */}
               <path d={areaData} fill="url(#areaGradient)" />
 
-              {/* Main price line with glow effect */}
               <path
                 d={pathData}
                 fill="none"
@@ -858,7 +845,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 filter="url(#glow)"
               />
 
-              {/* Data points with improved mobile interaction */}
               {validData.map((point, index) => {
                 const x = (index / (validData.length - 1)) * chartWidth
                 const y = chartHeight - ((point.y - minPrice + padding) / (priceRange + 2 * padding)) * chartHeight
@@ -882,7 +868,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
                 )
               })}
 
-              {/* Crosshair */}
               {showCrosshair && isFullscreenMode && (
                 <g className="pointer-events-none">
                   <line
@@ -907,7 +892,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               )}
             </svg>
 
-            {/* Enhanced X-axis labels */}
             <div className="absolute bottom-0 left-0 w-full flex justify-between text-xs text-white/60 font-mono mt-2 px-2 pointer-events-none select-none">
               {validData.length > 0 && (
                 <>
@@ -926,7 +910,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
               )}
             </div>
 
-            {/* Enhanced tooltip with better mobile positioning */}
             {tooltip.visible && (
               <div
                 className="pointer-events-none select-none"
@@ -958,7 +941,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             )}
           </div>
 
-          {/* Enhanced zoom controls for fullscreen - Desktop only */}
           {isFullscreenMode && (
             <div className="hidden md:flex absolute top-4 right-4 flex-col gap-2 bg-black/90 rounded-lg p-2 border border-white/30 backdrop-blur-sm z-[10000]">
               <Button
@@ -1062,7 +1044,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
     )
   }
 
-  // Enhanced fullscreen mode
   if (isFullscreen) {
     return (
       <div
@@ -1073,7 +1054,6 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
         }}
       >
         <div className="h-full flex flex-col">
-          {/* Sleek header */}
           <div
             className="flex-shrink-0 bg-black/50 border-b border-purple-500/30 backdrop-blur-xl"
             style={{ zIndex: 1000 }}
@@ -1117,12 +1097,10 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol }: TokenPric
             </div>
           </div>
 
-          {/* Chart area */}
           <div className="flex-1 overflow-hidden px-4 py-2" style={{ zIndex: 1 }}>
             <AdvancedChart data={priceData} isFullscreenMode={true} />
           </div>
 
-          {/* Enhanced footer */}
           <div
             className="flex-shrink-0 bg-black/50 border-t border-purple-500/30 backdrop-blur-xl p-3 text-center"
             style={{ zIndex: 1000 }}
