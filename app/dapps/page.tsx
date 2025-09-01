@@ -11,6 +11,7 @@ import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import { ZealousAPI, type ProtocolStats } from "@/lib/zealous-api"
+import { LFGAPI } from "@/lib/lfg-api"
 
 interface DApp {
   id: string
@@ -31,15 +32,23 @@ const categories = ["All", "DEX", "Lending", "NFT", "Bridge", "Gaming", "DeFi"]
 export default function DAppsPage() {
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
+  const [lfgStats, setLfgStats] = useState<{ totalTVL: number; totalVolume24h: number; totalTokens: number } | null>(
+    null,
+  )
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const zealousAPI = new ZealousAPI()
+  const lfgAPI = new LFGAPI()
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const stats = await zealousAPI.getProtocolStats()
-        setProtocolStats(stats)
+        const [zealousStats, lfgCombinedStats] = await Promise.all([
+          zealousAPI.getProtocolStats(),
+          lfgAPI.getCombinedStats(),
+        ])
+        setProtocolStats(zealousStats)
+        setLfgStats(lfgCombinedStats)
       } catch (error) {
         console.error("Failed to fetch protocol stats:", error)
       } finally {
@@ -73,7 +82,6 @@ export default function DAppsPage() {
     return `$${value.toFixed(2)}`
   }
 
-  // Create dapp with real stats
   const dapps: DApp[] = [
     {
       id: "zealous-swap",
@@ -88,6 +96,20 @@ export default function DAppsPage() {
       logo: "/zealous-logo.png",
       gradient: "from-blue-500 via-purple-500 to-pink-500",
       features: ["Automated Market Making", "Yield Farming", "Liquidity Mining", "Advanced Charts"],
+    },
+    {
+      id: "lfg-kaspa",
+      name: "LFG.kaspa",
+      description:
+        "Fully decentralized meme token launchpad and DEX with anti-bot protection and fair launch mechanisms.",
+      category: "DEX",
+      tvl: lfgStats ? formatCurrency(lfgStats.totalTVL) : "$0",
+      volume24h: lfgStats ? formatCurrency(lfgStats.totalVolume24h) : "$0",
+      pools: lfgStats ? lfgStats.totalTokens.toString() : "0",
+      status: "live",
+      logo: "/lfg-logo.png",
+      gradient: "from-green-500 via-teal-500 to-blue-500",
+      features: ["Launchpad", "DEX", "Anti-Bot Protection", "Fair Launch"],
     },
   ]
 
@@ -119,6 +141,10 @@ export default function DAppsPage() {
     }
   }
 
+  const combinedTVL = (protocolStats?.totalTVL || 0) + (lfgStats?.totalTVL || 0)
+  const combinedVolume = (protocolStats?.totalVolumeUSD || 0) + (lfgStats?.totalVolume24h || 0)
+  const combinedPools = (protocolStats?.poolCount || 0) + (lfgStats?.totalTokens || 0)
+
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
@@ -149,14 +175,14 @@ export default function DAppsPage() {
           >
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white font-orbitron">1</div>
+                <div className="text-2xl font-bold text-white font-orbitron">2</div>
                 <div className="text-sm text-white/70 font-rajdhani">Total DApps</div>
               </CardContent>
             </Card>
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-white font-orbitron">
-                  {loading ? "..." : protocolStats ? formatCurrency(protocolStats.totalTVL) : "$0"}
+                  {loading ? "..." : formatCurrency(combinedTVL)}
                 </div>
                 <div className="text-sm text-white/70 font-rajdhani">Total TVL</div>
               </CardContent>
@@ -164,16 +190,14 @@ export default function DAppsPage() {
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-white font-orbitron">
-                  {loading ? "..." : protocolStats ? formatCurrency(protocolStats.totalVolumeUSD) : "$0"}
+                  {loading ? "..." : formatCurrency(combinedVolume)}
                 </div>
                 <div className="text-sm text-white/70 font-rajdhani">Total Volume</div>
               </CardContent>
             </Card>
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white font-orbitron">
-                  {loading ? "..." : protocolStats ? protocolStats.poolCount : "0"}
-                </div>
+                <div className="text-2xl font-bold text-white font-orbitron">{loading ? "..." : combinedPools}</div>
                 <div className="text-sm text-white/70 font-rajdhani">Active Pools</div>
               </CardContent>
             </Card>
@@ -265,7 +289,9 @@ export default function DAppsPage() {
                           <Database className="h-4 w-4 text-purple-400 mr-1" />
                         </div>
                         <div className="text-sm font-bold text-white font-orbitron">{dapp.pools}</div>
-                        <div className="text-xs text-white/50 font-rajdhani">Pools</div>
+                        <div className="text-xs text-white/50 font-rajdhani">
+                          {dapp.id === "lfg-kaspa" ? "Tokens" : "Pools"}
+                        </div>
                       </div>
                     </div>
 
