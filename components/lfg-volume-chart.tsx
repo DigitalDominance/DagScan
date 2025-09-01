@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts"
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts"
 import { LFGAPI, type LFGStats } from "@/lib/lfg-api"
 
 interface VolumeData {
@@ -94,9 +94,9 @@ export default function LFGVolumeChart() {
   return (
     <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <CardTitle className="text-white font-orbitron">Platform Volume (24h)</CardTitle>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
               24h: {stats ? formatCurrency(stats.data.tradeVolumes.combined["1d"]) : "$0"}
             </Badge>
@@ -108,31 +108,46 @@ export default function LFGVolumeChart() {
       </CardHeader>
       <CardContent>
         {loading ? (
-          <div className="h-[300px] flex items-center justify-center">
+          <div className="h-[250px] sm:h-[300px] flex items-center justify-center">
             <div className="text-white/70 font-rajdhani">Loading volume data...</div>
           </div>
         ) : (
-          <div className="h-[300px]">
+          <div className="h-[250px] sm:h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={volumeData}>
+              <AreaChart data={volumeData}>
+                <defs>
+                  <linearGradient id="volumeGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                    <stop offset="50%" stopColor="#3b82f6" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#1e40af" stopOpacity={0.1} />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
-                <XAxis dataKey="time" stroke="rgba(255,255,255,0.5)" fontSize={12} fontFamily="Rajdhani" />
+                <XAxis
+                  dataKey="time"
+                  stroke="rgba(255,255,255,0.5)"
+                  fontSize={10}
+                  fontFamily="Rajdhani"
+                  interval="preserveStartEnd"
+                />
                 <YAxis
                   stroke="rgba(255,255,255,0.5)"
-                  fontSize={12}
+                  fontSize={10}
                   fontFamily="Rajdhani"
                   tickFormatter={formatCurrency}
+                  width={60}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Line
+                <Area
                   type="monotone"
                   dataKey="volume"
                   stroke="#10b981"
                   strokeWidth={2}
+                  fill="url(#volumeGradient)"
                   dot={false}
                   activeDot={{ r: 4, fill: "#10b981" }}
                 />
-              </LineChart>
+              </AreaChart>
             </ResponsiveContainer>
           </div>
         )}

@@ -20,6 +20,7 @@ interface DApp {
   category: string
   tvl: string
   volume24h: string
+  volume24hRaw: number
   pools: string
   status: "live" | "beta" | "coming-soon"
   logo: string
@@ -91,6 +92,7 @@ export default function DAppsPage() {
       category: "DEX",
       tvl: protocolStats ? formatCurrency(protocolStats.totalTVL) : "$0",
       volume24h: protocolStats ? formatCurrency(protocolStats.totalVolumeUSD) : "$0",
+      volume24hRaw: protocolStats?.totalVolumeUSD || 0,
       pools: protocolStats ? protocolStats.poolCount.toString() : "0",
       status: "live",
       logo: "/zealous-logo.png",
@@ -105,6 +107,7 @@ export default function DAppsPage() {
       category: "DEX",
       tvl: lfgStats ? formatCurrency(lfgStats.totalTVL) : "$0",
       volume24h: lfgStats ? formatCurrency(lfgStats.totalVolume24h) : "$0",
+      volume24hRaw: lfgStats?.totalVolume24h || 0,
       pools: lfgStats ? lfgStats.totalTokens.toString() : "0",
       status: "live",
       logo: "/lfg-logo.png",
@@ -113,7 +116,9 @@ export default function DAppsPage() {
     },
   ]
 
-  const filteredDApps = selectedCategory === "All" ? dapps : dapps.filter((dapp) => dapp.category === selectedCategory)
+  const sortedDapps = [...dapps].sort((a, b) => b.volume24hRaw - a.volume24hRaw)
+  const filteredDApps =
+    selectedCategory === "All" ? sortedDapps : sortedDapps.filter((dapp) => dapp.category === selectedCategory)
 
   const getStatusColor = (status: string) => {
     switch (status) {

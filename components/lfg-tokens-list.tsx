@@ -124,17 +124,17 @@ export default function LFGTokensList() {
   return (
     <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
       <CardHeader>
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <CardTitle className="text-white font-orbitron">LFG Tokens</CardTitle>
-          <div className="flex gap-2">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50 h-4 w-4" />
               <Input
                 placeholder="Search tokens..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyPress={(e) => e.key === "Enter" && handleSearch()}
-                className="pl-10 bg-black/40 border-white/20 text-white placeholder:text-white/50 font-rajdhani"
+                className="pl-10 bg-black/40 border-white/20 text-white placeholder:text-white/50 font-rajdhani w-full sm:w-64"
               />
             </div>
             <Button
@@ -160,21 +160,21 @@ export default function LFGTokensList() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.05 }}
-                  className="flex items-center justify-between p-4 bg-black/20 rounded-lg border border-white/10 hover:border-white/20 transition-all cursor-pointer"
+                  className="flex flex-col lg:flex-row lg:items-center justify-between p-4 bg-black/20 rounded-lg border border-white/10 hover:border-white/20 transition-all cursor-pointer gap-4"
                   onClick={() => handleTokenClick(token.tokenAddress)}
                 >
-                  <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-4 flex-1">
                     <img
                       src={token.image || "/placeholder.svg?height=40&width=40"}
                       alt={token.name}
-                      className="h-10 w-10 rounded-full"
+                      className="h-10 w-10 rounded-full flex-shrink-0"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement
                         target.src = "/placeholder.svg?height=40&width=40"
                       }}
                     />
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h3 className="text-white font-semibold font-orbitron">{token.ticker}</h3>
                         <Badge
                           variant="outline"
@@ -187,13 +187,15 @@ export default function LFGTokensList() {
                           {token.state}
                         </Badge>
                       </div>
-                      <p className="text-white/70 text-sm font-rajdhani">{token.name}</p>
+                      <p className="text-white/70 text-sm font-rajdhani truncate">{token.name}</p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-6">
-                    <div className="text-right">
-                      <div className="text-white font-semibold font-orbitron">{formatPrice(token.price)}</div>
+                  <div className="grid grid-cols-2 lg:flex lg:items-center gap-4 lg:gap-6">
+                    <div className="text-left lg:text-right">
+                      <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
+                        {formatPrice(token.price)}
+                      </div>
                       <div className="flex items-center gap-1">
                         {token.priceChange["1d"] >= 0 ? (
                           <TrendingUp className="h-3 w-3 text-green-400" />
@@ -211,27 +213,33 @@ export default function LFGTokensList() {
                       </div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-white font-semibold font-orbitron">{formatCurrency(token.marketCap)}</div>
+                    <div className="text-left lg:text-right">
+                      <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
+                        {formatCurrency(token.marketCap)}
+                      </div>
                       <div className="text-white/50 text-xs font-rajdhani">Market Cap</div>
                     </div>
 
-                    <div className="text-right">
-                      <div className="text-white font-semibold font-orbitron">{formatCurrency(token.volume["1d"])}</div>
+                    <div className="text-left lg:text-right">
+                      <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
+                        {formatCurrency(token.volume["1d"])}
+                      </div>
                       <div className="text-white/50 text-xs font-rajdhani">Volume 24h</div>
                     </div>
 
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="text-white/70 hover:text-white hover:bg-white/10"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        window.open(`https://lfg.kaspa.com/token/${token.tokenAddress}`, "_blank")
-                      }}
-                    >
-                      <ExternalLink className="h-4 w-4" />
-                    </Button>
+                    <div className="flex justify-end">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="text-white/70 hover:text-white hover:bg-white/10"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          window.open(`https://lfg.kaspa.com/token/${token.tokenAddress}`, "_blank")
+                        }}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
                 </motion.div>
               ))}

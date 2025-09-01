@@ -18,11 +18,10 @@ import { useRouter } from "next/navigation"
 
 export default function ZealousSwapPage() {
   const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
+  const [tokenCount, setTokenCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
-
-  const [tokenCount, setTokenCount] = useState<number>(0)
 
   const zealousAPI = new ZealousAPI()
 
@@ -32,6 +31,17 @@ export default function ZealousSwapPage() {
         setLoading(true)
         const stats = await zealousAPI.getProtocolStats()
         setProtocolStats(stats)
+
+        // Get token count for the verified tokens card
+        try {
+          const tokens = await zealousAPI.getTokens(1, 0) // Just get first page to get total count
+          // This is a simple way to get count - in real implementation you'd want a dedicated endpoint
+          const allTokens = await zealousAPI.getTokens(1000, 0) // Get a large number to count
+          setTokenCount(allTokens.length)
+        } catch (tokenError) {
+          console.warn("Could not fetch token count:", tokenError)
+          setTokenCount(0)
+        }
       } catch (err) {
         console.error("Failed to fetch protocol stats:", err)
         setError("Failed to load protocol statistics")
@@ -40,21 +50,7 @@ export default function ZealousSwapPage() {
       }
     }
 
-    const fetchTokenCount = async () => {
-      try {
-        // Fetch first page to get total count efficiently
-        const tokensData = await zealousAPI.getTokens(100, 0) // Get up to 100 tokens
-        setTokenCount(tokensData.length)
-      } catch (err) {
-        console.error("Failed to fetch token count:", err)
-        setTokenCount(0)
-      }
-    }
-
-    const fetchData = async () => {
-      await Promise.all([fetchProtocolStats(), fetchTokenCount()])
-    }
-    fetchData()
+    fetchProtocolStats()
   }, [])
 
   const handleSearch = (query: string) => {
@@ -86,7 +82,6 @@ export default function ZealousSwapPage() {
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
         <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
-
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
           <div className="mb-6">
@@ -100,7 +95,6 @@ export default function ZealousSwapPage() {
                 Back to DApps
               </span>
             </Button>
-
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -117,7 +111,6 @@ export default function ZealousSwapPage() {
                   </div>
                 </div>
               </div>
-
               <div className="flex gap-3">
                 <Button
                   className="relative text-white font-rajdhani hover:bg-black/60 active:bg-black/80 overflow-hidden before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-br before:from-green-500 before:to-blue-500 after:absolute after:inset-[1px] after:bg-black/40 after:backdrop-blur-xl after:rounded-[calc(0.375rem-1px)] hover:after:bg-black/60 active:after:bg-black/80"
@@ -155,26 +148,26 @@ export default function ZealousSwapPage() {
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Verified Tokens</CardTitle>
-                <Coins className="h-4 w-4 text-blue-400" />
+                <Coins className="h-4 w-4 text-purple-400" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-white font-orbitron">
                   {loading ? "Loading..." : error ? "Error" : tokenCount}
                 </div>
-                <p className="text-xs text-blue-300 mt-1 font-inter">Active tokens</p>
+                <p className="text-xs text-purple-300 mt-1 font-inter">Available tokens</p>
               </CardContent>
             </Card>
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl col-span-2 md:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Active Pools</CardTitle>
-                <Droplets className="h-4 w-4 text-purple-400" />
+                <Droplets className="h-4 w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold text-white font-orbitron">
                   {loading ? "Loading..." : error ? "Error" : protocolStats?.poolCount || 0}
                 </div>
-                <p className="text-xs text-purple-300 mt-1 font-inter">Liquidity pools</p>
+                <p className="text-xs text-blue-300 mt-1 font-inter">Liquidity pools</p>
               </CardContent>
             </Card>
           </motion.div>
@@ -208,18 +201,15 @@ export default function ZealousSwapPage() {
                   Pools
                 </TabsTrigger>
               </TabsList>
-
               <TabsContent value="tokens">
                 <ZealousTokensList />
               </TabsContent>
-
               <TabsContent value="pools">
                 <ZealousPoolsTable />
               </TabsContent>
             </Tabs>
           </motion.div>
         </main>
-
         <Footer />
       </div>
     </BeamsBackground>

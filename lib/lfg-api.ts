@@ -149,7 +149,6 @@ export class LFGAPI {
   async getTokens(page = 1, sortBy = "Market Cap (High to Low)"): Promise<LFGTokensResponse> {
     const params = new URLSearchParams({
       sortBy,
-      view: "grid",
       page: page.toString(),
     })
 
@@ -173,7 +172,7 @@ export class LFGAPI {
       page: page.toString(),
     })
 
-    const response = await this.fetchAPI<LFGTokensResponse>(`${BACKEND_BASE_URL}/api/lfg/search?${params}`)
+    const response = await this.fetchAPI<LFGTokensResponse>(`${BASE_URL}/tokens?${params}`)
 
     // Process tokens to add proper logo URLs
     if (response.result) {
@@ -195,7 +194,7 @@ export class LFGAPI {
     if (from) params.append("from", from)
     if (to) params.append("to", to)
 
-    return this.fetchAPI<LFGHistoricalResponse>(`${BASE_URL}/${tokenAddress}/history?${params}`)
+    return this.fetchAPI<LFGHistoricalResponse>(`/api/dagscan/lfg/${tokenAddress}/history?${params}`)
   }
 
   async takeSnapshot(
@@ -206,7 +205,15 @@ export class LFGAPI {
       pages: pages.toString(),
     })
 
-    return this.fetchAPI(`${BASE_URL}/${tokenAddress}/snapshot?${params}`)
+    const response = await fetch(`/api/dagscan/lfg/${tokenAddress}/snapshot?${params}`, {
+      method: "POST",
+    })
+
+    if (!response.ok) {
+      throw new Error(`API request failed: ${response.statusText}`)
+    }
+
+    return response.json()
   }
 
   // Helper method to get combined stats for dashboard

@@ -6,12 +6,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, DollarSign, ExternalLink, Coins, TrendingUp } from "lucide-react"
+import { ArrowLeft, DollarSign, ExternalLink, Coins, TrendingUp, Layers } from "lucide-react"
 import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import LFGTokensList from "@/components/lfg-tokens-list"
 import LFGVolumeChart from "@/components/lfg-volume-chart"
+import LFGStakingPools from "@/components/lfg-staking-pools"
 import { LFGAPI, type LFGStats } from "@/lib/lfg-api"
 import { useRouter } from "next/navigation"
 
@@ -97,17 +98,17 @@ export default function LFGKaspaPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+              className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8"
             >
-              <div className="flex items-center gap-4">
-                <img src="/lfg-logo.png" alt="LFG.kaspa" className="h-16 w-16 rounded-xl" />
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+                <img src="/lfg-logo.png" alt="LFG.kaspa" className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl" />
                 <div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-white font-orbitron">LFG.kaspa</h1>
-                  <p className="text-white/70 font-rajdhani text-lg">Meme Token Launchpad & DEX</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <Badge className="bg-green-500/20 text-green-300 border-green-500/30">Active</Badge>
-                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">DEX</Badge>
-                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">Launchpad</Badge>
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white font-orbitron">LFG.kaspa</h1>
+                  <p className="text-white/70 font-rajdhani text-base sm:text-lg">Meme Token Launchpad & DEX</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
+                    <Badge className="bg-green-500/20 text-green-300 border-green-500/30 text-xs">Active</Badge>
+                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">DEX</Badge>
+                    <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30 text-xs">Launchpad</Badge>
                   </div>
                 </div>
               </div>
@@ -130,7 +131,7 @@ export default function LFGKaspaPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-2 md:grid-cols-3 gap-6 mb-8"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8"
           >
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -138,7 +139,7 @@ export default function LFGKaspaPage() {
                 <TrendingUp className="h-4 w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">
+                <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
                   {loading
                     ? "Loading..."
                     : error
@@ -155,20 +156,20 @@ export default function LFGKaspaPage() {
                 <DollarSign className="h-4 w-4 text-green-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">
+                <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
                   {loading ? "Loading..." : error ? "Error" : formatCurrency(lfgStats?.data.tvl.total || 0)}
                 </div>
                 <p className="text-xs text-green-300 mt-1 font-inter">Total Value Locked</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-black/40 border-white/20 backdrop-blur-xl col-span-2 md:col-span-1">
+            <Card className="bg-black/40 border-white/20 backdrop-blur-xl sm:col-span-2 lg:col-span-1">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Total Tokens</CardTitle>
                 <Coins className="h-4 w-4 text-purple-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">
+                <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
                   {loading
                     ? "Loading..."
                     : error
@@ -195,17 +196,29 @@ export default function LFGKaspaPage() {
           {/* Tokens List */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
             <Tabs defaultValue="tokens" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-1 bg-black/40 border-white/20">
+              <TabsList className="grid w-full grid-cols-2 bg-black/40 border-white/20">
                 <TabsTrigger
                   value="tokens"
-                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-white/70 font-rajdhani"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-green-500 data-[state=active]:to-blue-500 data-[state=active]:text-white text-white/70 font-rajdhani text-sm"
                 >
                   <Coins className="h-4 w-4 mr-2" />
-                  All Tokens
+                  <span className="hidden sm:inline">All Tokens</span>
+                  <span className="sm:hidden">Tokens</span>
+                </TabsTrigger>
+                <TabsTrigger
+                  value="staking"
+                  className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-pink-500 data-[state=active]:text-white text-white/70 font-rajdhani text-sm"
+                >
+                  <Layers className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Staking Pools</span>
+                  <span className="sm:hidden">Staking</span>
                 </TabsTrigger>
               </TabsList>
               <TabsContent value="tokens">
                 <LFGTokensList />
+              </TabsContent>
+              <TabsContent value="staking">
+                <LFGStakingPools />
               </TabsContent>
             </Tabs>
           </motion.div>

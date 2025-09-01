@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { motion } from "motion/react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -73,12 +73,15 @@ export default function LFGTokenPage() {
 
   const formatPrice = (value: number) => {
     if (value >= 1) {
+      return `$${value.toFixed(4)}`
+    }
+    if (value >= 0.01) {
       return `$${value.toFixed(6)}`
     }
-    if (value >= 0.001) {
+    if (value >= 0.0001) {
       return `$${value.toFixed(8)}`
     }
-    return `$${value.toFixed(12)}`
+    return `$${value.toFixed(10)}`
   }
 
   if (loading) {
@@ -140,24 +143,26 @@ export default function LFGTokenPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8"
+              className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-8"
             >
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                 <img
                   src={token.image || "/placeholder.svg?height=64&width=64"}
                   alt={token.name}
-                  className="h-16 w-16 rounded-xl"
+                  className="h-12 w-12 sm:h-16 sm:w-16 rounded-xl flex-shrink-0"
                   onError={(e) => {
                     const target = e.target as HTMLImageElement
                     target.src = "/placeholder.svg?height=64&width=64"
                   }}
                 />
-                <div>
-                  <h1 className="text-3xl md:text-4xl font-bold text-white font-orbitron">{token.ticker}</h1>
-                  <p className="text-white/70 font-rajdhani text-lg">{token.name}</p>
-                  <div className="flex items-center gap-2 mt-2">
+                <div className="min-w-0">
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white font-orbitron">
+                    {token.ticker}
+                  </h1>
+                  <p className="text-white/70 font-rajdhani text-base sm:text-lg truncate">{token.name}</p>
+                  <div className="flex flex-wrap items-center gap-2 mt-2">
                     <Badge
-                      className={`${
+                      className={`text-xs ${
                         token.state === "graduated"
                           ? "bg-green-500/20 text-green-300 border-green-500/30"
                           : "bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
@@ -165,7 +170,7 @@ export default function LFGTokenPage() {
                     >
                       {token.state}
                     </Badge>
-                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">LFG Token</Badge>
+                    <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30 text-xs">LFG Token</Badge>
                   </div>
                 </div>
               </div>
@@ -188,20 +193,20 @@ export default function LFGTokenPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8"
+            className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-6 mb-8"
           >
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Price</CardTitle>
-                <DollarSign className="h-4 w-4 text-green-400" />
+                <CardTitle className="text-xs lg:text-sm font-medium text-white/70 font-rajdhani">Price</CardTitle>
+                <DollarSign className="h-3 w-3 lg:h-4 lg:w-4 text-green-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">{formatPrice(token.price)}</div>
+                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">{formatPrice(token.price)}</div>
                 <div className="flex items-center gap-1 mt-1">
                   {token.priceChange["1d"] >= 0 ? (
-                    <TrendingUp className="h-3 w-3 text-green-400" />
+                    <TrendingUp className="h-2 w-2 lg:h-3 lg:w-3 text-green-400" />
                   ) : (
-                    <TrendingDown className="h-3 w-3 text-red-400" />
+                    <TrendingDown className="h-2 w-2 lg:h-3 lg:w-3 text-red-400" />
                   )}
                   <span
                     className={`text-xs font-rajdhani ${
@@ -217,33 +222,37 @@ export default function LFGTokenPage() {
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Market Cap</CardTitle>
-                <TrendingUp className="h-4 w-4 text-blue-400" />
+                <CardTitle className="text-xs lg:text-sm font-medium text-white/70 font-rajdhani">Market Cap</CardTitle>
+                <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">{formatCurrency(token.marketCap)}</div>
+                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
+                  {formatCurrency(token.marketCap)}
+                </div>
                 <p className="text-xs text-blue-300 mt-1 font-inter">Total market value</p>
               </CardContent>
             </Card>
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Volume 24h</CardTitle>
-                <Activity className="h-4 w-4 text-purple-400" />
+                <CardTitle className="text-xs lg:text-sm font-medium text-white/70 font-rajdhani">Volume 24h</CardTitle>
+                <Activity className="h-3 w-3 lg:h-4 lg:w-4 text-purple-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">{formatCurrency(token.volume["1d"])}</div>
+                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
+                  {formatCurrency(token.volume["1d"])}
+                </div>
                 <p className="text-xs text-purple-300 mt-1 font-inter">24h trading volume</p>
               </CardContent>
             </Card>
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium text-white/70 font-rajdhani">Progress</CardTitle>
-                <Activity className="h-4 w-4 text-orange-400" />
+                <CardTitle className="text-xs lg:text-sm font-medium text-white/70 font-rajdhani">Progress</CardTitle>
+                <Activity className="h-3 w-3 lg:h-4 lg:w-4 text-orange-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-white font-orbitron">{token.progress}%</div>
+                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">{token.progress}%</div>
                 <p className="text-xs text-orange-300 mt-1 font-inter">Bonding curve progress</p>
               </CardContent>
             </Card>
@@ -271,14 +280,16 @@ export default function LFGTokenPage() {
                   <p className="text-white/70 font-inter">{token.description}</p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   <div>
                     <h4 className="text-white/70 font-rajdhani text-sm">Contract Address</h4>
                     <p className="text-white font-mono text-sm break-all">{token.tokenAddress}</p>
                   </div>
                   <div>
                     <h4 className="text-white/70 font-rajdhani text-sm">Total Supply</h4>
-                    <p className="text-white font-orbitron">{token.totalSupply.toLocaleString()}</p>
+                    <p className="text-white font-orbitron text-xs sm:text-sm lg:text-base">
+                      {token.totalSupply.toLocaleString()}
+                    </p>
                   </div>
                   <div>
                     <h4 className="text-white/70 font-rajdhani text-sm">Decimals</h4>
@@ -289,44 +300,6 @@ export default function LFGTokenPage() {
                     <p className="text-white font-rajdhani">{new Date(token.createdAt).toLocaleDateString()}</p>
                   </div>
                 </div>
-
-                {token.socials && (
-                  <div>
-                    <h4 className="text-white/70 font-rajdhani text-sm mb-2">Social Links</h4>
-                    <div className="flex gap-2">
-                      {token.socials.website && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10 bg-transparent"
-                          onClick={() => window.open(token.socials!.website, "_blank")}
-                        >
-                          Website
-                        </Button>
-                      )}
-                      {token.socials.twitter && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10 bg-transparent"
-                          onClick={() => window.open(`https://twitter.com/${token.socials!.twitter}`, "_blank")}
-                        >
-                          Twitter
-                        </Button>
-                      )}
-                      {token.socials.telegram && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-white/20 text-white/70 hover:text-white hover:bg-white/10 bg-transparent"
-                          onClick={() => window.open(`https://t.me/${token.socials!.telegram}`, "_blank")}
-                        >
-                          Telegram
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </motion.div>
