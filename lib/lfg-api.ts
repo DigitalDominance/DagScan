@@ -1,4 +1,4 @@
-const BASE_URL = "https://api.dev-lfg.kaspa.com"
+const BASE_URL = "/api/lfg"
 const BACKEND_BASE_URL = "https://dagscanbackend-7220ff41cc76.herokuapp.com"
 const IPFS_BASE_URL = "https://ipfs.io/ipfs/"
 
@@ -153,7 +153,7 @@ export class LFGAPI {
       page: page.toString(),
     })
 
-    const response = await this.fetchAPI<LFGTokensResponse>(`${BASE_URL}/tokens/search?${params}`)
+    const response = await this.fetchAPI<LFGTokensResponse>(`${BASE_URL}/tokens?${params}`)
 
     // Process tokens to add proper logo URLs
     if (response.result) {
@@ -195,7 +195,7 @@ export class LFGAPI {
     if (from) params.append("from", from)
     if (to) params.append("to", to)
 
-    return this.fetchAPI<LFGHistoricalResponse>(`${BACKEND_BASE_URL}/api/lfg/${tokenAddress}/history?${params}`)
+    return this.fetchAPI<LFGHistoricalResponse>(`${BASE_URL}/${tokenAddress}/history?${params}`)
   }
 
   async takeSnapshot(
@@ -206,7 +206,7 @@ export class LFGAPI {
       pages: pages.toString(),
     })
 
-    return this.fetchAPI(`${BACKEND_BASE_URL}/api/lfg/${tokenAddress}/snapshot?${params}`)
+    return this.fetchAPI(`${BASE_URL}/${tokenAddress}/snapshot?${params}`)
   }
 
   // Helper method to get combined stats for dashboard
