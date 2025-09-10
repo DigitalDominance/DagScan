@@ -22,6 +22,7 @@ import Footer from "@/components/footer"
 import TokenPriceChart from "@/components/token-price-chart"
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface TokenInfo extends Token {
   priceChange24h: number
@@ -37,6 +38,7 @@ interface ChartData {
 export default function TokenPage() {
   const params = useParams()
   const router = useRouter()
+  const { currentNetwork, handleNetworkChange } = useNetwork()
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +48,7 @@ export default function TokenPage() {
 
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI("kasplex")
+  const kasplexAPI = new KasplexAPI(currentNetwork)
 
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null || isNaN(value)) {
@@ -293,7 +295,7 @@ export default function TokenPage() {
     return (
       <CosmicBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center px-4">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
@@ -310,7 +312,7 @@ export default function TokenPage() {
     return (
       <CosmicBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center px-4">
             <div className="text-center">
               <p className="text-red-400 font-inter mb-4">{error || "Token not found"}</p>
@@ -328,7 +330,7 @@ export default function TokenPage() {
   return (
     <CosmicBackground>
       <div className="min-h-screen flex flex-col font-inter overflow-x-hidden">
-        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden w-full">
           {/* Header */}

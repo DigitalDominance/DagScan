@@ -17,7 +17,7 @@ export async function GET(request: NextRequest, { params }: { params: { tokenAdd
     if (to) queryParams.append("to", to)
 
     const tokenAddress = params.tokenAddress.toLowerCase()
-    const backendUrl = `https://dagscanbackend-7220ff41cc76.herokuapp.com/api/lfg/history?tokenAddress=${tokenAddress}&${queryParams}`
+    const backendUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}/lfg/history?tokenAddress=${tokenAddress}&${queryParams}`
     console.log("[v0] Calling backend URL:", backendUrl)
     console.log("[v0] Token address (lowercase):", tokenAddress)
 

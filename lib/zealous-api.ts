@@ -1,4 +1,4 @@
-const BASE_URL = "https://dagscanbackend-7220ff41cc76.herokuapp.com/api/zealous"
+const BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}/zealous`
 const TOKEN_LOGO_BASE_URL = "https://testnet.zealousswap.com/images/"
 
 export interface ProtocolStats {

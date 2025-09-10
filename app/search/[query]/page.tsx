@@ -11,6 +11,7 @@ import { ZealousAPI } from "@/lib/zealous-api"
 import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface TokenResult {
   address: string
@@ -37,6 +38,7 @@ interface AddressResult {
 export default function SearchPage() {
   const params = useParams()
   const router = useRouter()
+  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [searchResult, setSearchResult] = useState<any>(null)
   const [tokenResults, setTokenResults] = useState<TokenResult[]>([])
   const [dappResults, setDappResults] = useState<DappResult[]>([])
@@ -45,7 +47,7 @@ export default function SearchPage() {
   const [error, setError] = useState<string | null>(null)
 
   const query = decodeURIComponent(params.query as string)
-  const api = new KasplexAPI("kasplex")
+  const api = new KasplexAPI(currentNetwork)
   const zealousAPI = new ZealousAPI()
 
   // Get token logo URL using the same logic as VerifiedTokensList
@@ -230,7 +232,7 @@ export default function SearchPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
@@ -247,7 +249,7 @@ export default function SearchPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-6xl px-4 py-8">
           <div className="mb-6">

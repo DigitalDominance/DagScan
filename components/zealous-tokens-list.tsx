@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "luci
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface ZealousTokensListProps {
   limit?: number
@@ -15,6 +16,8 @@ interface ZealousTokensListProps {
 }
 
 export default function ZealousTokensList({ limit = 10, showPagination = true }: ZealousTokensListProps) {
+  const { currentNetwork } = useNetwork();
+
   const [tokens, setTokens] = useState<Token[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +28,7 @@ export default function ZealousTokensList({ limit = 10, showPagination = true }:
 
   const router = useRouter()
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI("kasplex")
+  const kasplexAPI = new KasplexAPI(currentNetwork)
   const tokensPerPage = limit
 
   const formatCurrency = (value: number | undefined | null) => {

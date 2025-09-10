@@ -12,10 +12,12 @@ import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import TokenPriceChart from "@/components/token-price-chart"
 import { LFGAPI, type LFGToken } from "@/lib/lfg-api"
+import { useNetwork } from "@/context/NetworkContext"
 
 export default function LFGTokenPage() {
   const params = useParams()
   const router = useRouter()
+  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [token, setToken] = useState<LFGToken | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -88,7 +90,7 @@ export default function LFGTokenPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+                    <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
             <div className="text-center py-20">
               <div className="text-white/70 font-rajdhani text-xl">Loading token data...</div>
@@ -104,7 +106,7 @@ export default function LFGTokenPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+                    <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
             <div className="text-center py-20">
               <div className="text-red-400 font-rajdhani text-xl">{error || "Token not found"}</div>
@@ -125,7 +127,7 @@ export default function LFGTokenPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+                  <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
           <div className="mb-6">

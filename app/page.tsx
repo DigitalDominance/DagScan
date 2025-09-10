@@ -6,17 +6,19 @@ import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Dashboard from "@/components/dashboard"
 import Footer from "@/components/footer"
+import { useNetwork } from "@/context/NetworkContext"
 
 export default function Home() {
-  const [currentNetwork, setCurrentNetwork] = useState<"kasplex" | "igra">("kasplex")
+  const { currentNetwork, handleNetworkChange } = useNetwork();
+  // const [currentNetwork, setCurrentNetwork] = useState<"kasplex" | "igra">("kasplex")
   const router = useRouter()
 
-  const handleNetworkChange = (network: "kasplex" | "igra") => {
-    // Only allow kasplex for now
-    if (network === "kasplex") {
-      setCurrentNetwork(network)
-    }
-  }
+  // const handleNetworkChange = (network: "kasplex" | "igra") => {
+  //   // Only allow kasplex for now
+  //   // if (network === "kasplex") {
+  //     setCurrentNetwork(network)
+  //   // }
+  // }
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)

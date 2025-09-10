@@ -103,7 +103,7 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
           } else {
             // Check if it's a contract via RPC
             try {
-              const api = new KasplexAPI("kasplex")
+              const api = new KasplexAPI(currentNetwork)
               const addressDetails = await api.getAddressDetails(query)
               const isContract = addressDetails.contractInfo?.isContract || false
 
@@ -330,15 +330,21 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                   <Button
                     variant="ghost"
                     size="sm"
-                    disabled
-                    className="text-xs text-white/30 cursor-not-allowed font-rajdhani px-3 py-1"
+                    onClick={() => onNetworkChange("igra")}
+                    // disabled
+                    // className="text-xs text-white/30 cursor-not-allowed font-rajdhani px-3 py-1"
+                    className={`text-xs font-rajdhani font-semibold px-3 py-1 relative ${
+                      currentNetwork === "igra"
+                        ? "bg-black/60 text-white border border-transparent before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-r before:from-purple-500 before:to-blue-500 before:-z-10"
+                        : "text-white/70 hover:text-white bg-black/40 hover:bg-black/60 border border-transparent hover:before:absolute hover:before:inset-0 hover:before:rounded-md hover:before:p-[1px] hover:before:bg-gradient-to-r hover:before:from-purple-500 hover:to-blue-500 hover:before:-z-10 hover:before:opacity-50"
+                    } transition-all duration-300`}                    
                   >
                     <img src="/igra-logo.png" alt="Igra" className="h-4 w-auto opacity-30" />
                   </Button>
-                  <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                  {/* <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
                     Coming Soon
                     <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-b-black/90"></div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
             </div>
@@ -393,14 +399,18 @@ export default function Navigation({ currentNetwork, onNetworkChange, onSearch }
                     <Button
                       variant="ghost"
                       size="sm"
-                      disabled
-                      className="text-xs text-white/30 cursor-not-allowed font-rajdhani px-3 py-1"
-                    >
+                      onClick={() => onNetworkChange("igra")}
+                      // disabled
+                      className={`text-xs font-rajdhani font-semibold px-3 py-1 ${
+                        currentNetwork === "igra"
+                          ? "bg-gradient-to-r from-purple-500 to-blue-500 text-white"
+                          : "text-white/70 hover:text-white"
+                      }`}                    >
                       <img src="/igra-logo.png" alt="Igra" className="h-4 w-auto opacity-30" />
                     </Button>
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
+                    {/* <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 px-3 py-1 bg-black/90 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap pointer-events-none">
                       Coming Soon
-                    </div>
+                    </div> */}
                   </div>
                 </div>
               </div>

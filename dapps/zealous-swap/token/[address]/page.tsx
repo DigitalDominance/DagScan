@@ -26,6 +26,7 @@ import Footer from "@/components/footer"
 import TokenPriceChart from "@/components/token-price-chart"
 import { ZealousAPI, type Pool, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface TokenInfo extends Token {
   priceChange24h: number
@@ -46,6 +47,7 @@ interface TokenApiInfo {
 export default function TokenPage() {
   const params = useParams()
   const router = useRouter()
+  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -55,12 +57,12 @@ export default function TokenPage() {
 
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI("kasplex")
+  const kasplexAPI = new KasplexAPI(currentNetwork)
 
   const fetchAllTokens = async (): Promise<TokenApiInfo[]> => {
     try {
       const response = await fetch(
-        `https://dagscanbackend-7220ff41cc76.herokuapp.com/api/zealous/tokens?limit=1000&skip=0`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/zealous/tokens?limit=1000&skip=0`,
       )
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
@@ -312,7 +314,7 @@ export default function TokenPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center px-4">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
@@ -329,7 +331,7 @@ export default function TokenPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center px-4">
             <div className="text-center">
               <p className="text-red-400 font-inter mb-4">{error || "Token not found"}</p>
@@ -347,7 +349,7 @@ export default function TokenPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter overflow-x-hidden">
-        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden w-full">
           {/* Header */}

@@ -1,5 +1,5 @@
 const BASE_URL = "/api/lfg"
-const BACKEND_BASE_URL = "https://dagscanbackend-7220ff41cc76.herokuapp.com"
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || ''
 const IPFS_BASE_URL = "https://ipfs.io/ipfs/"
 
 export interface LFGStats {

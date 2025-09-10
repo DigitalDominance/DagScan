@@ -36,7 +36,7 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
   const fetchAllTokens = async (): Promise<TokenInfo[]> => {
     try {
       const response = await fetch(
-        `https://dagscanbackend-7220ff41cc76.herokuapp.com/api/zealous/tokens?limit=1000&skip=0`,
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/zealous/tokens?limit=1000&skip=0`,
       )
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)

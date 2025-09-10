@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
 
     if (q) queryParams.append("q", q)
 
-    const response = await fetch(`https://dagscanbackend-7220ff41cc76.herokuapp.com/api/lfg/search?${queryParams}`, {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/lfg/search?${queryParams}`, {
       headers: {
         Accept: "application/json",
         "User-Agent": "DagScan/1.0",

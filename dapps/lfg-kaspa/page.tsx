@@ -15,8 +15,10 @@ import LFGVolumeChart from "@/components/lfg-volume-chart"
 import LFGStakingPools from "@/components/lfg-staking-pools"
 import { LFGAPI, type LFGStats } from "@/lib/lfg-api"
 import { useRouter } from "next/navigation"
+import { useNetwork } from "@/context/NetworkContext"
 
 export default function LFGKaspaPage() {
+  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [lfgStats, setLfgStats] = useState<LFGStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -81,7 +83,7 @@ export default function LFGKaspaPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+        <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
           <div className="mb-6">

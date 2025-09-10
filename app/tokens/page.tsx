@@ -11,6 +11,7 @@ import Footer from "@/components/footer"
 import VerifiedTokensList from "@/components/verified-tokens-list"
 import { ZealousAPI } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface TokenStats {
   verifiedTokenCount: number
@@ -34,13 +35,13 @@ interface TokenStats {
 }
 
 export default function TokensPage() {
-  const [currentNetwork, setCurrentNetwork] = useState<"kasplex" | "igra">("kasplex")
+  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [tokenStats, setTokenStats] = useState<TokenStats | null>(null)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
 
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI("kasplex")
+  const kasplexAPI = new KasplexAPI(currentNetwork)
 
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null || isNaN(value)) {
@@ -338,12 +339,6 @@ export default function TokensPage() {
     fetchTokenStats()
   }, [])
 
-  const handleNetworkChange = (network: "kasplex" | "igra") => {
-    if (network === "kasplex") {
-      setCurrentNetwork(network)
-    }
-  }
-
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)
   }
@@ -355,7 +350,7 @@ export default function TokensPage() {
   return (
     <CosmicBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
           {/* Header */}

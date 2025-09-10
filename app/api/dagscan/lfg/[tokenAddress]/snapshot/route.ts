@@ -6,7 +6,7 @@ export async function POST(request: NextRequest, { params }: { params: { tokenAd
     const pages = searchParams.get("pages") || "3"
 
     const response = await fetch(
-      `https://dagscanbackend-7220ff41cc76.herokuapp.com/api/lfg/${params.tokenAddress}/snapshot?pages=${pages}`,
+      `${process.env.NEXT_PUBLIC_BACKEND_URL}/lfg/${params.tokenAddress}/snapshot?pages=${pages}`,
       {
         method: "POST",
         headers: {

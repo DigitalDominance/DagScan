@@ -1,3 +1,5 @@
+import axios from "axios"
+
 interface RPCResponse<T = any> {
   jsonrpc: string
   id: number
@@ -92,31 +94,37 @@ class KasplexAPI {
   private chainId: number
   private currentRpcIndex = 0
   private useMockData = false
-  private baseApiUrl = "https://frontend.kasplextest.xyz/api/v2"
+  private network: string
+  public baseApiUrl = "https://frontend.kasplextest.xyz/api/v2"
 
-  constructor(network: "kasplex" | "igra") {
-    if (network === "kasplex") {
+  constructor(_network: "kasplex" | "igra") {
+    if (_network === "kasplex") {
       // Regular RPC nodes
       this.rpcUrls = [
         "https://rpc.kasplextest.xyz/",
-        "https://kasplex-testnet.rpc.thirdweb.com/",
-        "https://testnet-rpc.kasplex.org/",
+        // "https://kasplex-testnet.rpc.thirdweb.com/",
+        // "https://testnet-rpc.kasplex.org/",
       ]
 
       // Explorer APIs that might have indexed transaction data
       this.explorerApiUrls = [
-        "https://explorer-api.kasplextest.xyz/api",
-        "https://api.kasplextest.xyz/v1",
-        "https://testnet-api.kasplex.org/v1",
-        "https://kasplex-testnet-api.blockscout.com/api/v2",
+        'https://explorer.testnet.kasplextest.xyz/api/v2',
+        // "https://explorer-api.kasplextest.xyz/api",
+        // "https://api.kasplextest.xyz/v1",
+        // "https://testnet-api.kasplex.org/v1",
+        // "https://kasplex-testnet-api.blockscout.com/api/v2",
       ]
 
       this.chainId = 167012
     } else {
-      this.rpcUrls = ["https://rpc.igra.xyz/"]
-      this.explorerApiUrls = ["https://api.igra.xyz/v1"]
-      this.chainId = 167013
+      // this.rpcUrls = ["https://rpc.igra.xyz/"]
+      // this.explorerApiUrls = ["https://api.igra.xyz/v1"]
+      this.rpcUrls = ['https://caravel.igralabs.com:8545']
+      this.explorerApiUrls=['https://explorer.caravel.igralabs.com/api/v2']
+      this.chainId = 19416
     }
+    this.baseApiUrl = this.explorerApiUrls[0]  
+    this.network = _network  
   }
 
   private isValidAddress(address: string): boolean {
@@ -154,7 +162,7 @@ class KasplexAPI {
         } else {
           console.warn(`❌ Explorer API failed: ${response.status} ${response.statusText}`)
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn(`❌ Explorer API error for ${baseUrl}:`, error.message)
       }
     }
@@ -204,7 +212,7 @@ class KasplexAPI {
 
           this.currentRpcIndex = rpcIndex
           return data.result as T
-        } catch (error) {
+        } catch (error: any) {
           lastError = error as Error
           console.warn(`RPC call failed for ${method} (attempt ${attempt + 1}/${retries}) on ${rpcUrl}:`, error.message)
 
@@ -437,6 +445,7 @@ class KasplexAPI {
   async getLatestBlocks(count = 10): Promise<any[]> {
     try {
       const latestBlockNumber = await this.getLatestBlockNumber()
+      console.log('Latest Block Number', latestBlockNumber)
       const blockPromises = []
 
       for (let i = 0; i < count; i++) {
@@ -563,142 +572,17 @@ class KasplexAPI {
 
   // NEW: Ultra-fast address transaction history using Kasplex Frontend API
   async getAddressTransactionHistory(address: string, limit = 100): Promise<any[]> {
-    console.log(`🚀 Using Kasplex Frontend API for address: ${address}`)
-
     try {
-      // Use the official Kasplex frontend API
-      const apiUrl = `${this.baseApiUrl}/addresses/${address}/transactions`
+      const respnse = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/details/address/transaction_history`, {
+        address,
+        limit,
+        network: this.network
+      });
 
-      console.log(`📡 Fetching from: ${apiUrl}`)
+      const transactionHistory = respnse.data.transactionHistory;
 
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(15000),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API responded with ${response.status}: ${response.statusText}`)
-      }
-
-      const data = await response.json()
-      console.log(`✅ API Success: Found ${data.items?.length || 0} transactions`)
-
-      if (data.items && Array.isArray(data.items)) {
-        // Transform the API response to our format
-        const transactions = data.items.slice(0, limit).map((tx: any) => {
-          // Determine transaction type from the API data
-          let txType = "Transaction"
-          if (tx.transaction_types && tx.transaction_types.length > 0) {
-            const type = tx.transaction_types[0]
-            switch (type) {
-              case "token_transfer":
-                txType = "Token Transfer"
-                break
-              case "contract_creation":
-                txType = "Contract Creation"
-                break
-              case "contract_call":
-                txType = "Contract Call"
-                break
-              case "coin_transfer":
-                txType = "KAS Transfer"
-                break
-              case "token_creation":
-                txType = "Token Creation"
-                break
-              default:
-                txType = "Transaction"
-            }
-          } else if (tx.method) {
-            // Use method name if available
-            switch (tx.method) {
-              case "transfer":
-                txType = "Token Transfer"
-                break
-              case "transferFrom":
-                txType = "Token Transfer From"
-                break
-              case "approve":
-                txType = "Token Approval"
-                break
-              default:
-                txType = tx.method
-            }
-          }
-
-          // Convert value from wei to KAS
-          let value = "0.0000"
-          if (tx.value && tx.value !== "0") {
-            try {
-              const valueInWei = typeof tx.value === "string" ? tx.value : tx.value.toString()
-              value = (Number.parseInt(valueInWei, 10) / 1e18).toFixed(4)
-            } catch (error) {
-              console.warn("Error parsing value:", error)
-              value = "0.0000"
-            }
-          }
-
-          // Convert gas price
-          let gasPrice = "0.00"
-          if (tx.gas_price) {
-            try {
-              gasPrice = (Number.parseInt(tx.gas_price, 10) / 1e9).toFixed(2)
-            } catch (error) {
-              console.warn("Error parsing gas price:", error)
-            }
-          }
-
-          // Parse timestamp
-          let timestamp = Date.now()
-          if (tx.timestamp) {
-            try {
-              timestamp = new Date(tx.timestamp).getTime()
-            } catch (error) {
-              console.warn("Error parsing timestamp:", error)
-            }
-          }
-
-          return {
-            hash: tx.hash,
-            from: tx.from?.hash || tx.from,
-            to: tx.to?.hash || tx.to || "Contract Creation",
-            value,
-            gasPrice,
-            timestamp,
-            status: tx.status === "ok" ? "success" : "failed",
-            type: txType,
-            method: tx.method || "",
-            blockNumber: tx.block_number,
-            gasUsed: tx.gas_used?.toString() || "0",
-            // Include contract info if available
-            fromInfo: tx.from
-              ? {
-                  isContract: tx.from.is_contract || false,
-                  isVerified: tx.from.is_verified || false,
-                  name: tx.from.name || undefined,
-                }
-              : null,
-            toInfo: tx.to
-              ? {
-                  isContract: tx.to.is_contract || false,
-                  isVerified: tx.to.is_verified || false,
-                  name: tx.to.name || undefined,
-                }
-              : null,
-          }
-        })
-
-        console.log(`🎯 Processed ${transactions.length} transactions successfully`)
-        return transactions.sort((a, b) => b.timestamp - a.timestamp)
-      }
-
-      console.warn("⚠️ API returned no transaction items")
-      return []
-    } catch (error) {
+      return transactionHistory;
+    } catch (error: any) {
       console.error("❌ Kasplex Frontend API failed:", error.message)
 
       // Fallback to mock data instead of complex RPC calls
@@ -724,39 +608,14 @@ class KasplexAPI {
   // NEW: Get token balances for an address
   async getAddressTokenBalances(address: string): Promise<any[]> {
     try {
-      const apiUrl = `${this.baseApiUrl}/addresses/${address}/token-balances`
+      const respnse = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/details/address/transaction_history`, {
+        address,
+        network: this.network
+      });
 
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
-      })
+      const tokenBalances = respnse.data.tokenBalances;
 
-      if (!response.ok) {
-        throw new Error(`Token balances API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (Array.isArray(data)) {
-        return data.map((balance: any) => ({
-          token: {
-            address: balance.token?.address,
-            name: balance.token?.name,
-            symbol: balance.token?.symbol,
-            decimals: balance.token?.decimals,
-            type: balance.token?.type,
-            icon_url: balance.token?.icon_url,
-          },
-          value: balance.value,
-          token_id: balance.token_id,
-        }))
-      }
-
-      return []
+      return tokenBalances;      
     } catch (error) {
       console.error("Failed to get token balances:", error)
       return []
@@ -766,37 +625,15 @@ class KasplexAPI {
   // NEW: Get token transfers for an address
   async getAddressTokenTransfers(address: string, limit = 50): Promise<any[]> {
     try {
-      const apiUrl = `${this.baseApiUrl}/addresses/${address}/token-transfers`
+      const respnse = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/details/address/token_transfers`, {
+        address,
+        limit,
+        network: this.network
+      });
 
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
-      })
+      const tokenTransfers = respnse.data.tokenTransfers;
 
-      if (!response.ok) {
-        throw new Error(`Token transfers API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.items && Array.isArray(data.items)) {
-        return data.items.slice(0, limit).map((transfer: any) => ({
-          transaction_hash: transfer.transaction_hash,
-          from: transfer.from?.hash,
-          to: transfer.to?.hash,
-          token: transfer.token,
-          total: transfer.total,
-          method: transfer.method,
-          timestamp: transfer.timestamp,
-          type: transfer.type,
-        }))
-      }
-
-      return []
+      return tokenTransfers;  
     } catch (error) {
       console.error("Failed to get token transfers:", error)
       return []
@@ -806,39 +643,15 @@ class KasplexAPI {
   // NEW: Get NFTs for an address
   async getAddressNFTs(address: string, limit = 50): Promise<any[]> {
     try {
-      const apiUrl = `${this.baseApiUrl}/addresses/${address}/nft`
+      const respnse = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/details/address/nfts`, {
+        address,
+        limit,
+        network: this.network
+      });
 
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
-      })
+      const nfts = respnse.data.nfts;
 
-      if (!response.ok) {
-        throw new Error(`NFT API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.items && Array.isArray(data.items)) {
-        return data.items.slice(0, limit).map((nft: any) => ({
-          id: nft.id,
-          token_type: nft.token_type,
-          value: nft.value,
-          is_unique: nft.is_unique,
-          image_url: nft.image_url || nft.metadata?.image_url,
-          animation_url: nft.animation_url,
-          external_app_url: nft.external_app_url,
-          metadata: nft.metadata,
-          token: nft.token,
-          holder_address_hash: nft.holder_address_hash,
-        }))
-      }
-
-      return []
+      return nfts;  
     } catch (error) {
       console.error("Failed to get NFTs:", error)
       return []
@@ -846,43 +659,19 @@ class KasplexAPI {
   }
 
   async getAddressDetails(address: string): Promise<any> {
-    if (!this.isValidAddress(address)) {
-      throw new Error(`Invalid address format: ${address}`)
-    }
-
     try {
-      const [balance, transactionCount, tokenBalances, nfts] = await Promise.all([
-        this.getBalance(address),
-        this.rpcCall<string>("eth_getTransactionCount", [address, "latest"]),
-        this.getAddressTokenBalances(address), // Get token balances
-        this.getAddressNFTs(address), // NEW: Get NFTs
-      ])
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/address/details`, {
+        network: this.network, 
+        address
+      })
+  
+      const addressDetails = response.data;
 
-      let contractInfo: ContractInfo
-      try {
-        contractInfo = await this.getContractInfo(address)
-      } catch (error) {
-        console.error("Error getting contract info:", error)
-        contractInfo = { isContract: false, isVerified: false }
-      }
-
-      // Get transaction history using the new fast API
-      const addressTransactions = await this.getAddressTransactionHistory(address, 200)
-
-      return {
-        type: "address",
-        address,
-        balance,
-        transactionCount: Number.parseInt(transactionCount, 16),
-        transactions: addressTransactions,
-        tokenBalances, // Include token balances
-        nfts, // NEW: Include NFTs
-        contractInfo,
-      }
+      return addressDetails;
     } catch (error) {
-      console.error("Failed to get address details:", error)
       throw error
     }
+
   }
 
   async searchByHash(query: string): Promise<any> {
@@ -935,16 +724,16 @@ class KasplexAPI {
           if (block) {
             return {
               type: "block",
-              number: Number.parseInt(block.number, 16),
-              hash: block.hash,
-              timestamp: Number.parseInt(block.timestamp, 16) * 1000,
-              transactions: block.transactions || [],
-              gasUsed: block.gasUsed || "0",
-              gasLimit: block.gasLimit || "0",
-              miner: block.miner || "0x0000000000000000000000000000000000000000",
-              parentHash: block.parentHash || "",
-              difficulty: block.difficulty || "0",
-              size: block.size || "0",
+              number: Number.parseInt((block as any).number, 16),
+              hash: (block as any).hash,
+              timestamp: Number.parseInt((block as any).timestamp, 16) * 1000,
+              transactions: (block as any).transactions || [],
+              gasUsed: (block as any).gasUsed || "0",
+              gasLimit: (block as any).gasLimit || "0",
+              miner: (block as any).miner || "0x0000000000000000000000000000000000000000",
+              parentHash: (block as any).parentHash || "",
+              difficulty: (block as any).difficulty || "0",
+              size: (block as any).size || "0",
             }
           }
         } catch (blockError) {
@@ -1056,23 +845,14 @@ class KasplexAPI {
   // NEW: Get smart contract details using the new API endpoints
   async getSmartContractDetails(address: string): Promise<any> {
     try {
-      const apiUrl = `${this.baseApiUrl}/smart-contracts/${address}`
-
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/details/contract`, {
+        network: this.network, 
+        address
       })
+  
+      const smartcontractDetails = response.data.smartcontractDetails;
 
-      if (!response.ok) {
-        throw new Error(`Smart contract API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return data
+      return smartcontractDetails;      
     } catch (error) {
       console.error("Failed to get smart contract details:", error)
       return null
@@ -1082,23 +862,14 @@ class KasplexAPI {
   // NEW: Get token info using the new API endpoints
   async getTokenInfo(address: string): Promise<any> {
     try {
-      const apiUrl = `${this.baseApiUrl}/tokens/${address}`
-
-      const response = await fetch(apiUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/token/info`, {
+        network: this.network, 
+        address
       })
+  
+      const tokenInfo = response.data.tokenInfo;
 
-      if (!response.ok) {
-        throw new Error(`Token info API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-      return data
+      return tokenInfo;        
     } catch (error) {
       console.error("Failed to get token info:", error)
       return null
@@ -1176,35 +947,15 @@ class KasplexAPI {
   // NEW: Get token holders for a contract
   async getTokenHolders(address: string, limit = 50): Promise<{ holders: any[] }> {
     try {
-      const holdersUrl = `${this.baseApiUrl}/tokens/${address}/holders`
-
-      const response = await fetch(holdersUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/token/holders`, {
+        network: this.network, 
+        address,
+        limit
       })
+  
+      const holdersData = response.data.holdersData;
 
-      if (!response.ok) {
-        throw new Error(`Token holders API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.items && Array.isArray(data.items)) {
-        const holders = data.items.slice(0, limit).map((holder: any, index: number) => ({
-          address: holder.address?.hash || holder.address,
-          balance: holder.value,
-          tokenId: holder.token_id,
-          percentage: (Number.parseFloat(holder.value || "0") / Number.parseFloat(data.total_supply || "1")) * 100,
-        }))
-
-        return { holders }
-      }
-
-      return { holders: [] }
+      return { holders: holdersData };         
     } catch (error) {
       console.error("Failed to get token holders:", error)
       return { holders: [] }
@@ -1214,39 +965,15 @@ class KasplexAPI {
   // NEW: Get NFTs from a contract collection
   async getContractNFTs(address: string, limit = 50): Promise<{ nfts: any[] }> {
     try {
-      const nftsUrl = `${this.baseApiUrl}/tokens/${address}/instances`
-
-      const response = await fetch(nftsUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/contract/nft`, {
+        network: this.network, 
+        address,
+        limit
       })
+  
+      const nftData = response.data.nftData;
 
-      if (!response.ok) {
-        throw new Error(`Contract NFTs API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.items && Array.isArray(data.items)) {
-        const nfts = data.items.slice(0, limit).map((nft: any) => ({
-          id: nft.id,
-          owner: nft.owner?.hash || nft.holder_address_hash,
-          metadata: nft.metadata,
-          image_url: nft.image_url || nft.metadata?.image_url,
-          animation_url: nft.animation_url,
-          token_type: nft.token_type || "ERC721",
-          isUnique: nft.is_unique,
-          externalAppUrl: nft.external_app_url,
-        }))
-
-        return { nfts }
-      }
-
-      return { nfts: [] }
+      return { nfts: nftData }
     } catch (error) {
       console.error("Failed to get contract NFTs:", error)
       return { nfts: [] }
@@ -1256,39 +983,15 @@ class KasplexAPI {
   // NEW: Get token transfers for a contract
   async getTokenTransfers(address: string, limit = 50): Promise<any[]> {
     try {
-      const transfersUrl = `${this.baseApiUrl}/tokens/${address}/transfers`
-
-      const response = await fetch(transfersUrl, {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-        },
-        signal: AbortSignal.timeout(10000),
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/token/transfers`, {
+        network: this.network, 
+        address,
+        limit
       })
+  
+      const transfers = response.data.transfers;
 
-      if (!response.ok) {
-        throw new Error(`Token transfers API failed: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (data.items && Array.isArray(data.items)) {
-        return data.items.slice(0, limit).map((transfer: any) => ({
-          blockHash: transfer.block_hash,
-          from: transfer.from?.hash,
-          to: transfer.to?.hash,
-          logIndex: transfer.log_index,
-          method: transfer.method,
-          timestamp: transfer.timestamp,
-          token: transfer.token,
-          total: transfer.total,
-          transactionHash: transfer.transaction_hash,
-          type: transfer.type,
-        }))
-      }
-
-      return []
+      return transfers
     } catch (error) {
       console.error("Failed to get token transfers:", error)
       return []

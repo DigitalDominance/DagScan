@@ -4,6 +4,7 @@ import { Inter, Orbitron, Rajdhani } from "next/font/google"
 import "./globals.css"
 import { Analytics } from "@vercel/analytics/next"
 import { Suspense } from "react"
+import { NetworkProvider } from "@/context/NetworkContext"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -158,8 +159,10 @@ export default function RootLayout({
       </head>
       <body className="font-inter antialiased">
         <Suspense fallback={<div>Loading...</div>}>
-          {children}
-          <Analytics />
+          <NetworkProvider>
+            {children}
+            <Analytics />
+          </NetworkProvider>
         </Suspense>
       </body>
     </html>

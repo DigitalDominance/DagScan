@@ -12,17 +12,19 @@ import ClickableAddress from "@/components/clickable-address"
 import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
+import { useNetwork } from "@/context/NetworkContext"
 
 export default function TransactionPage() {
   const params = useParams()
   const router = useRouter()
+  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [txData, setTxData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copiedText, setCopiedText] = useState<string | null>(null)
 
   const txHash = params.hash as string
-  const api = new KasplexAPI("kasplex")
+  const api = new KasplexAPI(currentNetwork)
 
   useEffect(() => {
     const fetchTxData = async () => {
@@ -105,7 +107,7 @@ export default function TransactionPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
@@ -122,7 +124,7 @@ export default function TransactionPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <p className="text-red-400 font-inter mb-4">{error || "Transaction not found"}</p>
@@ -140,7 +142,7 @@ export default function TransactionPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
+        <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-6xl px-4 py-8">
           <div className="mb-6">

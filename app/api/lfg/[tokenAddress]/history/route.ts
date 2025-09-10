@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const BACKEND_BASE_URL = "https://dagscanbackend-7220ff41cc76.herokuapp.com"
+const BACKEND_BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || ''
 
 export async function GET(request: Request, { params }: { params: { tokenAddress: string } }) {
   try {
@@ -18,7 +18,7 @@ export async function GET(request: Request, { params }: { params: { tokenAddress
     if (from) queryParams.append("from", from)
     if (to) queryParams.append("to", to)
 
-    const response = await fetch(`${BACKEND_BASE_URL}/api/lfg/${params.tokenAddress}/history?${queryParams}`, {
+    const response = await fetch(`${BACKEND_BASE_URL}/lfg/${params.tokenAddress}/history?${queryParams}`, {
       headers: {
         "Content-Type": "application/json",
       },

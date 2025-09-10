@@ -9,6 +9,7 @@ import { TrendingUp, TrendingDown, BarChart3, X, Maximize2, Minimize2, ZoomIn, Z
 import { ZealousAPI } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { LFGAPI } from "@/lib/lfg-api"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface TokenPriceChartProps {
   tokenAddress: string
@@ -34,6 +35,8 @@ interface TooltipData {
 }
 
 export default function TokenPriceChart({ tokenAddress, tokenSymbol, apiType = "zealous" }: TokenPriceChartProps) {
+  const { currentNetwork } = useNetwork();
+
   const [priceData, setPriceData] = useState<ChartPoint[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -70,7 +73,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol, apiType = "
   const fullscreenRef = useRef<HTMLDivElement>(null)
 
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI("kasplex")
+  const kasplexAPI = new KasplexAPI(currentNetwork)
   const lfgAPI = new LFGAPI()
 
   const formatTimeLabel = (dateString: string, isShortRange: boolean) => {

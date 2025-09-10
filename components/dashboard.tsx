@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
+import axios from 'axios'
 import { motion, AnimatePresence } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +25,7 @@ import PaginatedBlocks from "./paginated-blocks"
 import PaginatedTransactions from "./paginated-transactions"
 import { useRouter } from "next/navigation"
 import AnimatedCounter from "./animated-counter"
+import { useNetwork } from "@/context/NetworkContext"
 
 interface DashboardProps {
   network: "kasplex" | "igra"
@@ -77,6 +79,7 @@ interface TransactionChartData {
 export default function Dashboard({ network, searchQuery, onSearchResult }: DashboardProps) {
   const [blocks, setBlocks] = useState<Block[]>([])
   const [transactions, setTransactions] = useState<Transaction[]>([])
+  const { currentNetwork } = useNetwork();
   const [stats, setStats] = useState({
     latestBlock: 0,
     totalTransactions: 0,
@@ -109,17 +112,17 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   const fetchKasplexStats = useCallback(async () => {
     try {
       const [statsResponse, chartResponse] = await Promise.all([
-        fetch("https://frontend.kasplextest.xyz/api/v2/stats"),
-        fetch("https://frontend.kasplextest.xyz/api/v2/stats/charts/transactions"),
-      ])
+        axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/stats`, { network }),
+        axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/stats/charts/transactions`, { network }),
+      ]);
 
-      if (statsResponse.ok) {
-        const statsData = await statsResponse.json()
+      if (statsResponse.status === 200) {
+        const statsData = statsResponse.data.stats
         setKasplexStats(statsData)
       }
 
-      if (chartResponse.ok) {
-        const chartData = await chartResponse.json()
+      if (chartResponse.status === 200) {
+        const chartData = chartResponse.data.transactions
         setTransactionChartData(chartData.chart_data || [])
       }
     } catch (error) {
@@ -141,7 +144,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
         total_addresses: "259035",
       })
     }
-  }, [])
+  }, [network])
 
   const fetchData = useCallback(
     async (showError = true) => {
@@ -228,7 +231,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   useEffect(() => {
     const interval = setInterval(() => {
       fetchKasplexStats()
-    }, 3000)
+    }, 10000)
 
     return () => clearInterval(interval)
   }, [fetchKasplexStats])
@@ -237,7 +240,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   useEffect(() => {
     const interval = setInterval(() => {
       fetchData(false) // Don't show errors on background updates
-    }, 3000)
+    }, 10000)
 
     return () => clearInterval(interval)
   }, [fetchData])
@@ -435,10 +438,16 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}>
           <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
             <CardHeader className="pb-3">
-              <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
+              {
+              currentNetwork === 'kasplex' ? <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
                 <img src="/kaspa-logo.png" alt="Kaspa" className="h-5 w-5" />
                 Kaspa Market Data
-              </CardTitle>
+              </CardTitle> :
+              <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
+                <img src="/igra_logo.png" alt="Kaspa" className="h-5 w-5" />
+                Igra Market Data
+              </CardTitle>              
+              }
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Main Market Cards - Mobile: 2 cards on first row, 1 full-width on second row */}
@@ -449,18 +458,21 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                   <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-green-500/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 sm:px-6 pt-2 sm:pt-6">
                       <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani truncate">
-                        KAS Price
+                        {currentNetwork === 'kasplex' ? 'KAS Price' : 'Igra Price'}
                       </CardTitle>
-                      <img src="/kaspa-logo.png" alt="Kaspa" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      { currentNetwork === 'kasplex' ? <img src="/kaspa-logo.png" alt="Kaspa" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      :
+                      <img src="/igra_logo.png" alt="Igra" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                      }
                     </CardHeader>
                     <CardContent className="px-2 sm:px-6 pb-2 sm:pb-6">
                       <div className="flex flex-col">
                         <div className="text-sm sm:text-2xl font-bold text-white font-orbitron">
-                          {kasplexStats ? formatPrice(kasplexStats.coin_price) : "$0.0000"}
+                          {kasplexStats ? formatPrice(kasplexStats.coin_price || '0.0000') : "$0.0000"}
                         </div>
                         {kasplexStats && (
                           <div className="flex items-center">
-                            {formatPriceChange(kasplexStats.coin_price_change_percentage)}
+                            {formatPriceChange(kasplexStats.coin_price_change_percentage || 0)}
                           </div>
                         )}
                       </div>
