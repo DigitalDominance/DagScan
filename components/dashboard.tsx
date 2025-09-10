@@ -111,14 +111,19 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   // Fetch Kasplex stats from the new API
   const fetchKasplexStats = useCallback(async () => {
     try {
-      const [statsResponse, chartResponse] = await Promise.all([
+      const [statsResponse, chartResponse, priceResponse] = await Promise.all([
         axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/stats`, { network }),
         axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/stats/charts/transactions`, { network }),
+        axios.get("https://api.kaspa.org/info/price?stringOnly=false"), // Fetch coin price
       ]);
 
       if (statsResponse.status === 200) {
         const statsData = statsResponse.data.stats
-        setKasplexStats(statsData)
+        const coinPrice = priceResponse.data.price; // Extract coin price from the response
+        setKasplexStats({
+          ...statsData,
+          coin_price: coinPrice, // Add the fetched coin price to the stats
+        });
       }
 
       if (chartResponse.status === 200) {
@@ -290,11 +295,19 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
 
   const formatHash = (hash: string) => `${hash.slice(0, 8)}...${hash.slice(-6)}`
   const formatTime = (timestamp: number) => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000)
-    if (seconds < 60) return `${seconds}s ago`
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-    return `${Math.floor(seconds / 3600)}h ago`
-  }
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  
+    if (seconds < 0) {
+      const futureSeconds = Math.abs(seconds);
+      if (futureSeconds < 60) return `in ${futureSeconds}s`;
+      if (futureSeconds < 3600) return `in ${Math.floor(futureSeconds / 60)}m`;
+      return `in ${Math.floor(futureSeconds / 3600)}h`;
+    }
+  
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
+  };
 
   const formatPrice = (price: string) => {
     return `$${Number.parseFloat(price).toFixed(4)}`

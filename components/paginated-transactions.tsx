@@ -163,11 +163,19 @@ export default function PaginatedTransactions({
 
   const formatHash = (hash: string) => `${hash.slice(0, 10)}...${hash.slice(-8)}`
   const formatTime = (timestamp: number) => {
-    const seconds = Math.floor((Date.now() - timestamp) / 1000)
-    if (seconds < 60) return `${seconds}s ago`
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
-    return `${Math.floor(seconds / 3600)}h ago`
-  }
+    const seconds = Math.floor((Date.now() - timestamp) / 1000);
+  
+    if (seconds < 0) {
+      const futureSeconds = Math.abs(seconds);
+      if (futureSeconds < 60) return `in ${futureSeconds}s`;
+      if (futureSeconds < 3600) return `in ${Math.floor(futureSeconds / 60)}m`;
+      return `in ${Math.floor(futureSeconds / 3600)}h`;
+    }
+  
+    if (seconds < 60) return `${seconds}s ago`;
+    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+    return `${Math.floor(seconds / 3600)}h ago`;
+  };
 
   const getTransactionTypeColor = (type: string) => {
     switch (type) {
