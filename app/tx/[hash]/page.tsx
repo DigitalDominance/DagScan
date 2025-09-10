@@ -43,7 +43,7 @@ export default function TransactionPage() {
     if (txHash) {
       fetchTxData()
     }
-  }, [txHash])
+  }, [txHash, currentNetwork])
 
   const copyToClipboard = async (text: string) => {
     try {

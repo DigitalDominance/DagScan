@@ -222,7 +222,7 @@ export default function SearchPage() {
     if (query) {
       performSearch()
     }
-  }, [query, router])
+  }, [query, router, currentNetwork])
 
   const handleSearch = (newQuery: string) => {
     router.push(`/search/${encodeURIComponent(newQuery)}`)

@@ -268,7 +268,7 @@ export default function TokenPage() {
     if (tokenAddress) {
       fetchTokenInfoData()
     }
-  }, [tokenAddress])
+  }, [tokenAddress, currentNetwork])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)

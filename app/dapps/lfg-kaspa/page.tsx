@@ -41,7 +41,7 @@ export default function LFGKaspaPage() {
     }
 
     fetchStats()
-  }, [])
+  }, [currentNetwork])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)

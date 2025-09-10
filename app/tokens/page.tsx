@@ -337,7 +337,7 @@ export default function TokensPage() {
     }
 
     fetchTokenStats()
-  }, [])
+  }, [currentNetwork])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)

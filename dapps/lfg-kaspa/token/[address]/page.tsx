@@ -49,7 +49,7 @@ export default function LFGTokenPage() {
     }
 
     fetchTokenData()
-  }, [tokenAddress])
+  }, [tokenAddress, currentNetwork])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)

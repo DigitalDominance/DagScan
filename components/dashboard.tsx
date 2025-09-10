@@ -474,7 +474,8 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                   <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-green-500/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 sm:px-6 pt-2 sm:pt-6">
                       <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani truncate">
-                        {currentNetwork === 'kasplex' ? 'KAS Price' : 'Igra Price'}
+                        {/* {currentNetwork === 'kasplex' ? 'KAS Price' : 'Igra Price'} */}
+                        iKAS Price
                       </CardTitle>
                       { currentNetwork === 'kasplex' ? <img src="/kaspa-logo.png" alt="Kaspa" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                       :

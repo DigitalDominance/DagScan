@@ -53,7 +53,7 @@ export default function ZealousSwapPage() {
     }
 
     fetchProtocolStats()
-  }, [])
+  }, [currentNetwork])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)

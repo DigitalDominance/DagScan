@@ -62,8 +62,11 @@ export default function AddressPage() {
   const address = params.address as string
   const api = new KasplexAPI(currentNetwork)
 
+  console.log('API Network:', api.network)
+
   useEffect(() => {
     const fetchAddressData = async () => {
+      console.log('Fetch Address Data', currentNetwork)
       try {
         setLoading(true)
         const data = await api.getAddressDetails(address)
@@ -118,7 +121,7 @@ export default function AddressPage() {
     if (address) {
       fetchAddressData()
     }
-  }, [address])
+  }, [address, currentNetwork])
 
   const copyToClipboard = async (text: string) => {
     try {

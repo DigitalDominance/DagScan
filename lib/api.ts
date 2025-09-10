@@ -94,7 +94,7 @@ class KasplexAPI {
   private chainId: number
   private currentRpcIndex = 0
   private useMockData = false
-  private network: string
+  public network: string
   public baseApiUrl = "https://frontend.kasplextest.xyz/api/v2"
 
   constructor(_network: "kasplex" | "igra") {
@@ -444,27 +444,15 @@ class KasplexAPI {
 
   async getLatestBlocks(count = 10): Promise<any[]> {
     try {
-      const latestBlockNumber = await this.getLatestBlockNumber()
-      console.log('Latest Block Number', latestBlockNumber)
-      const blockPromises = []
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/main-page/blocks`, {
+        count,
+        network: this.network
+      });
 
-      for (let i = 0; i < count; i++) {
-        blockPromises.push(this.getBlock(latestBlockNumber - i, true))
-      }
+      const latestBlocks = response.data.blocks;
 
-      const blocks = await Promise.all(blockPromises)
-
-      return blocks.map((block, index) => ({
-        number: Number.parseInt(block.number, 16),
-        hash: block.hash || `0x${Math.random().toString(16).substr(2, 64)}`,
-        timestamp: Number.parseInt(block.timestamp, 16) * 1000,
-        transactions: block.transactions?.length || Math.floor(Math.random() * 50),
-        gasUsed: Number.parseInt(block.gasUsed || "0", 16).toString(),
-        gasLimit: Number.parseInt(block.gasLimit || "0", 16).toString(),
-        miner: block.miner || "0x1234567890123456789012345678901234567890",
-      }))
+      return latestBlocks;
     } catch (error) {
-      console.error("Failed to fetch latest blocks:", error)
       return Array.from({ length: count }, (_, i) => ({
         number: MOCK_DATA.latestBlockNumber - i,
         hash: `0x${Math.random().toString(16).substr(2, 64)}`,
@@ -479,80 +467,14 @@ class KasplexAPI {
 
   async getLatestTransactions(count = 15): Promise<any[]> {
     try {
-      const blocksToFetch = Math.min(15, Math.ceil(count / 3))
-      const latestBlocks = await this.getLatestBlocks(blocksToFetch)
-      const allTransactions = []
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/main-page/transactions`, {
+        count,
+        network: this.network
+      });
 
-      for (const block of latestBlocks) {
-        try {
-          const fullBlock = await this.getBlock(block.number, true)
-          if (fullBlock.transactions && Array.isArray(fullBlock.transactions)) {
-            for (const tx of fullBlock.transactions) {
-              if (typeof tx === "object" && tx.hash && this.isValidTxHash(tx.hash)) {
-                try {
-                  const receipt = await this.getTransactionReceipt(tx.hash)
-                  const txType = this.detectTransactionType(tx, receipt)
+      const latestTransactions = response.data.transactions;
 
-                  let toInfo = null
-                  if (tx.to) {
-                    try {
-                      toInfo = await this.getContractInfo(tx.to)
-                    } catch (error) {
-                      console.error("Failed to get contract info:", error)
-                      toInfo = { isContract: false, isVerified: false }
-                    }
-                  }
-
-                  allTransactions.push({
-                    hash: tx.hash,
-                    from: tx.from,
-                    to: tx.to || "Contract Creation",
-                    toInfo,
-                    value: (Number.parseInt(tx.value || "0", 16) / 1e18).toFixed(4),
-                    gasPrice: (Number.parseInt(tx.gasPrice || "0", 16) / 1e9).toFixed(2),
-                    timestamp: Number.parseInt(fullBlock.timestamp, 16) * 1000,
-                    status: receipt?.status === "0x1" ? "success" : "failed",
-                    type: txType,
-                    input: tx.input || "0x",
-                  })
-
-                  if (allTransactions.length >= count) {
-                    break
-                  }
-                } catch (error) {
-                  console.error("Failed to get transaction receipt:", error)
-                }
-              }
-            }
-          }
-        } catch (error) {
-          console.error("Failed to get full block:", error)
-        }
-
-        if (allTransactions.length >= count) {
-          break
-        }
-      }
-
-      allTransactions.sort((a, b) => b.timestamp - a.timestamp)
-
-      while (allTransactions.length < count) {
-        const mockTx = {
-          hash: `0x${Math.random().toString(16).substr(2, 64)}`,
-          from: "0x1234567890123456789012345678901234567890",
-          to: "0x0987654321098765432109876543210987654321",
-          toInfo: { isContract: false, isVerified: false },
-          value: (Math.random() * 10).toFixed(4),
-          gasPrice: (20 + Math.random() * 50).toFixed(2),
-          timestamp: Date.now() - Math.random() * 3600000,
-          status: Math.random() > 0.1 ? "success" : "failed",
-          type: ["KAS Transfer", "Token Transfer", "Contract Call"][Math.floor(Math.random() * 3)],
-          input: "0x",
-        }
-        allTransactions.push(mockTx)
-      }
-
-      return allTransactions.slice(0, count)
+      return latestTransactions;
     } catch (error) {
       console.error("Failed to fetch latest transactions:", error)
       return Array.from({ length: count }, () => ({
