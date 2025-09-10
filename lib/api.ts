@@ -660,12 +660,12 @@ class KasplexAPI {
 
   async getAddressDetails(address: string): Promise<any> {
     try {
-      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/address/details`, {
+      const response = await axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/details/address`, {
         network: this.network, 
         address
       })
   
-      const addressDetails = response.data;
+      const addressDetails = response.data.addressDetails;
 
       return addressDetails;
     } catch (error) {
