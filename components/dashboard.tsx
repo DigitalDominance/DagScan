@@ -111,18 +111,21 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   // Fetch Kasplex stats from the new API
   const fetchKasplexStats = useCallback(async () => {
     try {
-      const [statsResponse, chartResponse, priceResponse] = await Promise.all([
+      const [statsResponse, chartResponse, priceResponse, marketCapResponse] = await Promise.all([
         axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/stats`, { network }),
         axios.post(`${process.env.NEXT_PUBLIC_BACKEND_NETWORK_URL}/stats/charts/transactions`, { network }),
         axios.get("https://api.kaspa.org/info/price?stringOnly=false"), // Fetch coin price
+        axios.get("https://api.kaspa.org/info/marketcap?stringOnly=false"), // Fetch coin marketcap
       ]);
 
       if (statsResponse.status === 200) {
-        const statsData = statsResponse.data.stats
+        const statsData = statsResponse.data.stats;
         const coinPrice = priceResponse.data.price; // Extract coin price from the response
+        const marketCap = marketCapResponse.data.marketcap;
         setKasplexStats({
           ...statsData,
           coin_price: coinPrice, // Add the fetched coin price to the stats
+          market_cap: marketCap
         });
       }
 
