@@ -239,7 +239,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   useEffect(() => {
     const interval = setInterval(() => {
       fetchKasplexStats()
-    }, 10000)
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [fetchKasplexStats])
@@ -248,7 +248,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
   useEffect(() => {
     const interval = setInterval(() => {
       fetchData(false) // Don't show errors on background updates
-    }, 10000)
+    }, 3000)
 
     return () => clearInterval(interval)
   }, [fetchData])
