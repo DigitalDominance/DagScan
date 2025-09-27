@@ -95,20 +95,20 @@ class KasplexAPI {
   private currentRpcIndex = 0
   private useMockData = false
   public network: string
-  public baseApiUrl = "https://frontend.kasplextest.xyz/api/v2"
+  public baseApiUrl = "https://explorer.kasplex.org/api/v2"
 
   constructor(_network: "kasplex" | "igra") {
     if (_network === "kasplex") {
       // Regular RPC nodes
       this.rpcUrls = [
-        "https://rpc.kasplextest.xyz/",
+        "https://evmrpc.kasplex.org/",
         // "https://kasplex-testnet.rpc.thirdweb.com/",
         // "https://testnet-rpc.kasplex.org/",
       ]
 
       // Explorer APIs that might have indexed transaction data
       this.explorerApiUrls = [
-        'https://explorer.testnet.kasplextest.xyz/api/v2',
+        'https://explorer.kasplex.org/api/v2',
         // "https://explorer-api.kasplextest.xyz/api",
         // "https://api.kasplextest.xyz/v1",
         // "https://testnet-api.kasplex.org/v1",
