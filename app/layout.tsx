@@ -127,8 +127,8 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
 
         {/* DNS Prefetch for API endpoints */}
-        <link rel="dns-prefetch" href="https://rpc.kasplextest.xyz" />
-        <link rel="dns-prefetch" href="https://frontend.kasplextest.xyz" />
+        <link rel="dns-prefetch" href="https://evmrpc.kasplex.org" />
+        <link rel="dns-prefetch" href="https://api-explorer.kasplex.org" />
 
         {/* Structured Data for Search Engines */}
         <script
