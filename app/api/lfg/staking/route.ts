@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 
 export async function GET(request: NextRequest) {
   try {
-    const response = await fetch("https://api.dev-lfg.kaspa.com/staking/search", {
+    const response = await fetch("https://api.lfg.kaspa.com/staking/search", {
       headers: {
         Accept: "application/json",
         "User-Agent": "DagScan/1.0",
