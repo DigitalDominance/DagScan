@@ -95,7 +95,7 @@ class KasplexAPI {
   private currentRpcIndex = 0
   private useMockData = false
   public network: string
-  public baseApiUrl = "https://explorer.kasplex.org/api/v2"
+  public baseApiUrl = "https://api-explorer.kasplex.org/api/v2"
 
   constructor(_network: "kasplex" | "igra") {
     if (_network === "kasplex") {
@@ -108,14 +108,14 @@ class KasplexAPI {
 
       // Explorer APIs that might have indexed transaction data
       this.explorerApiUrls = [
-        'https://explorer.kasplex.org/api/v2',
+        'https://api-explorer.kasplex.org/api/v2',
         // "https://explorer-api.kasplextest.xyz/api",
         // "https://api.kasplextest.xyz/v1",
         // "https://testnet-api.kasplex.org/v1",
         // "https://kasplex-testnet-api.blockscout.com/api/v2",
       ]
 
-      this.chainId = 167012
+      this.chainId = 202555
     } else {
       // this.rpcUrls = ["https://rpc.igra.xyz/"]
       // this.explorerApiUrls = ["https://api.igra.xyz/v1"]
