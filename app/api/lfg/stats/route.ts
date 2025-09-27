@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-const LFG_BASE_URL = "https://api.dev-lfg.kaspa.com"
+const LFG_BASE_URL = "https://api.lfg.kaspa.com"
 
 export async function GET() {
   try {
