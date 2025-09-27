@@ -1,5 +1,5 @@
 const BASE_URL = `${process.env.NEXT_PUBLIC_BACKEND_URL}/zealous`
-const TOKEN_LOGO_BASE_URL = "cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/"
+const TOKEN_LOGO_BASE_URL = "https://cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/"
 
 export interface ProtocolStats {
   totalTVL: number
