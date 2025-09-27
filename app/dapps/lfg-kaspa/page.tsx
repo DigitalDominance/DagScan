@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { motion } from "motion/react"
+import { motion } from "framer-motion"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -15,10 +15,8 @@ import LFGVolumeChart from "@/components/lfg-volume-chart"
 import LFGStakingPools from "@/components/lfg-staking-pools"
 import { LFGAPI, type LFGStats } from "@/lib/lfg-api"
 import { useRouter } from "next/navigation"
-import { useNetwork } from "@/context/NetworkContext"
 
 export default function LFGKaspaPage() {
-  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [lfgStats, setLfgStats] = useState<LFGStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,7 +39,7 @@ export default function LFGKaspaPage() {
     }
 
     fetchStats()
-  }, [currentNetwork])
+  }, [])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)
@@ -49,23 +47,23 @@ export default function LFGKaspaPage() {
 
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null || isNaN(value)) {
-      return "$0.00"
+      return "0"
     }
     if (value >= 1e9) {
-      return `$${(value / 1e9).toFixed(2)}B`
+      return `${(value / 1e9).toFixed(2)}B`
     }
     if (value >= 1e6) {
-      return `$${(value / 1e6).toFixed(2)}M`
+      return `${(value / 1e6).toFixed(2)}M`
     } else if (value >= 1e3) {
-      return `$${(value / 1e3).toFixed(2)}K`
+      return `${(value / 1e3).toFixed(2)}K`
     }
     if (value >= 1) {
-      return `$${value.toFixed(6)}`
+      return `${value.toFixed(6)}`
     }
     if (value >= 0.001) {
-      return `$${value.toFixed(8)}`
+      return `${value.toFixed(8)}`
     }
-    return `$${value.toFixed(12)}`
+    return `${value.toFixed(12)}`
   }
 
   const formatNumber = (value: number | undefined | null) => {
@@ -83,7 +81,7 @@ export default function LFGKaspaPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
           <div className="mb-6">
@@ -141,12 +139,15 @@ export default function LFGKaspaPage() {
                 <TrendingUp className="h-4 w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
-                  {loading
-                    ? "Loading..."
-                    : error
-                      ? "Error"
-                      : formatCurrency(lfgStats?.data.tradeVolumes.combined["1d"] || 0)}
+                <div className="flex items-center gap-2">
+                  <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
+                    {loading
+                      ? "Loading..."
+                      : error
+                        ? "Error"
+                        : formatCurrency(lfgStats?.data.tradeVolumes.combined["1d"] || 0)}
+                  </div>
+                  {!loading && !error && <img src="/kaspa-logo.png" alt="KAS" className="h-5 w-5" />}
                 </div>
                 <p className="text-xs text-blue-300 mt-1 font-inter">24h trading volume</p>
               </CardContent>
@@ -158,8 +159,11 @@ export default function LFGKaspaPage() {
                 <DollarSign className="h-4 w-4 text-green-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
-                  {loading ? "Loading..." : error ? "Error" : formatCurrency(lfgStats?.data.tvl.total || 0)}
+                <div className="flex items-center gap-2">
+                  <div className="text-xl sm:text-2xl font-bold text-white font-orbitron">
+                    {loading ? "Loading..." : error ? "Error" : formatCurrency(lfgStats?.data.tvl.total || 0)}
+                  </div>
+                  {!loading && !error && <img src="/kaspa-logo.png" alt="KAS" className="h-5 w-5" />}
                 </div>
                 <p className="text-xs text-green-300 mt-1 font-inter">Total Value Locked</p>
               </CardContent>

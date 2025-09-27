@@ -69,14 +69,14 @@ export default function LFGStakingPools() {
 
   const formatCurrency = (value: number) => {
     if (value >= 1e9) {
-      return `$${(value / 1e9).toFixed(2)}B`
+      return `${(value / 1e9).toFixed(2)}B`
     }
     if (value >= 1e6) {
-      return `$${(value / 1e6).toFixed(2)}M`
+      return `${(value / 1e6).toFixed(2)}M`
     } else if (value >= 1e3) {
-      return `$${(value / 1e3).toFixed(2)}K`
+      return `${(value / 1e3).toFixed(2)}K`
     }
-    return `$${value.toFixed(2)}`
+    return `${value.toFixed(2)}`
   }
 
   const formatNumber = (value: number) => {
@@ -164,14 +164,10 @@ export default function LFGStakingPools() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 flex-1">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 flex-1">
                     <div className="text-center sm:text-left">
                       <p className="text-white/70 text-xs font-rajdhani">APR</p>
                       <p className="text-green-400 font-semibold font-orbitron text-sm">{formatAPR(pool.apr)}</p>
-                    </div>
-                    <div className="text-center sm:text-left">
-                      <p className="text-white/70 text-xs font-rajdhani">APR USD</p>
-                      <p className="text-blue-400 font-semibold font-orbitron text-sm">{formatCurrency(pool.aprusd)}</p>
                     </div>
                     <div className="text-center sm:text-left">
                       <p className="text-white/70 text-xs font-rajdhani">Total Staked</p>
@@ -193,7 +189,7 @@ export default function LFGStakingPools() {
                   <Button
                     size="sm"
                     className="relative text-white font-rajdhani hover:bg-black/60 active:bg-black/80 overflow-hidden before:absolute before:inset-0 before:rounded-md before:p-[1px] before:bg-gradient-to-br before:from-green-500 before:to-blue-500 after:absolute after:inset-[1px] after:bg-black/40 after:backdrop-blur-xl after:rounded-[calc(0.375rem-1px)] hover:after:bg-black/60 active:after:bg-black/80"
-                    onClick={() => window.open(`https://dev-lfg.kaspa.com/app/stake/${pool.id}`, "_blank")}
+                    onClick={() => window.open(`https://lfg.kaspa.com/app/stake/${pool.id}`, "_blank")}
                   >
                     <span className="relative z-10 flex items-center text-xs">
                       <ExternalLink className="h-3 w-3 mr-1" />

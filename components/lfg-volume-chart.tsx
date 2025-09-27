@@ -62,11 +62,11 @@ export default function LFGVolumeChart() {
 
   const formatCurrency = (value: number) => {
     if (value >= 1e6) {
-      return `$${(value / 1e6).toFixed(2)}M`
+      return `${(value / 1e6).toFixed(2)}M KAS`
     } else if (value >= 1e3) {
-      return `$${(value / 1e3).toFixed(2)}K`
+      return `${(value / 1e3).toFixed(2)}K KAS`
     }
-    return `$${value.toFixed(2)}`
+    return `${value.toFixed(2)} KAS`
   }
 
   const CustomTooltip = ({ active, payload, label }: any) => {
@@ -74,7 +74,10 @@ export default function LFGVolumeChart() {
       return (
         <div className="bg-black/80 border border-white/20 rounded-lg p-3 backdrop-blur-xl">
           <p className="text-white/70 text-sm font-rajdhani">{`Time: ${label}`}</p>
-          <p className="text-green-400 font-semibold font-orbitron">{`Volume: ${formatCurrency(payload[0].value)}`}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-green-400 font-semibold font-orbitron">{`Volume: ${formatCurrency(payload[0].value)}`}</p>
+            <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4" />
+          </div>
         </div>
       )
     }
@@ -98,10 +101,16 @@ export default function LFGVolumeChart() {
           <CardTitle className="text-white font-orbitron">Platform Volume (24h)</CardTitle>
           <div className="flex flex-wrap gap-2">
             <Badge className="bg-green-500/20 text-green-300 border-green-500/30">
-              24h: {stats ? formatCurrency(stats.data.tradeVolumes.combined["1d"]) : "$0"}
+              <div className="flex items-center gap-1">
+                24h: {stats ? formatCurrency(stats.data.tradeVolumes.combined["1d"]) : "0 KAS"}
+                <img src="/kaspa-logo.png" alt="KAS" className="h-3 w-3" />
+              </div>
             </Badge>
             <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
-              7d: {stats ? formatCurrency(stats.data.tradeVolumes.combined["7d"]) : "$0"}
+              <div className="flex items-center gap-1">
+                7d: {stats ? formatCurrency(stats.data.tradeVolumes.combined["7d"]) : "0 KAS"}
+                <img src="/kaspa-logo.png" alt="KAS" className="h-3 w-3" />
+              </div>
             </Badge>
           </div>
         </div>

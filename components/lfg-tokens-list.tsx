@@ -75,30 +75,30 @@ export default function LFGTokensList() {
 
   const formatCurrency = (value: number) => {
     if (value >= 1e9) {
-      return `$${(value / 1e9).toFixed(2)}B`
+      return `${(value / 1e9).toFixed(2)}B`
     }
     if (value >= 1e6) {
-      return `$${(value / 1e6).toFixed(2)}M`
+      return `${(value / 1e6).toFixed(2)}M`
     } else if (value >= 1e3) {
-      return `$${(value / 1e3).toFixed(2)}K`
+      return `${(value / 1e3).toFixed(2)}K`
     }
     if (value >= 1) {
-      return `$${value.toFixed(6)}`
+      return `${value.toFixed(6)}`
     }
     if (value >= 0.001) {
-      return `$${value.toFixed(8)}`
+      return `${value.toFixed(8)}`
     }
-    return `$${value.toFixed(12)}`
+    return `${value.toFixed(12)}`
   }
 
   const formatPrice = (value: number) => {
     if (value >= 1) {
-      return `$${value.toFixed(6)}`
+      return `${value.toFixed(6)}`
     }
     if (value >= 0.001) {
-      return `$${value.toFixed(8)}`
+      return `${value.toFixed(8)}`
     }
-    return `$${value.toFixed(12)}`
+    return `${value.toFixed(12)}`
   }
 
   const handleTokenClick = (tokenAddress: string) => {
@@ -193,8 +193,11 @@ export default function LFGTokensList() {
 
                   <div className="grid grid-cols-2 lg:flex lg:items-center gap-4 lg:gap-6">
                     <div className="text-left lg:text-right">
-                      <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
-                        {formatPrice(token.price)}
+                      <div className="flex items-center justify-start lg:justify-end gap-1">
+                        <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4" />
+                        <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
+                          {formatPrice(token.price)}
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         {token.priceChange["1d"] >= 0 ? (
@@ -214,15 +217,21 @@ export default function LFGTokensList() {
                     </div>
 
                     <div className="text-left lg:text-right">
-                      <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
-                        {formatCurrency(token.marketCap)}
+                      <div className="flex items-center justify-start lg:justify-end gap-1">
+                        <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4" />
+                        <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
+                          {formatCurrency(token.marketCap)}
+                        </div>
                       </div>
                       <div className="text-white/50 text-xs font-rajdhani">Market Cap</div>
                     </div>
 
                     <div className="text-left lg:text-right">
-                      <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
-                        {formatCurrency(token.volume["1d"])}
+                      <div className="flex items-center justify-start lg:justify-end gap-1">
+                        <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4" />
+                        <div className="text-white font-semibold font-orbitron text-sm lg:text-base">
+                          {formatCurrency(token.volume["1d"])}
+                        </div>
                       </div>
                       <div className="text-white/50 text-xs font-rajdhani">Volume 24h</div>
                     </div>

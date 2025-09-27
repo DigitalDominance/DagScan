@@ -15,10 +15,8 @@ import ZealousPoolsTable from "@/components/zealous-pools-table"
 import ZealousTokensList from "@/components/zealous-tokens-list"
 import { ZealousAPI, type ProtocolStats } from "@/lib/zealous-api"
 import { useRouter } from "next/navigation"
-import { useNetwork } from "@/context/NetworkContext"
 
 export default function ZealousSwapPage() {
-  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
   const [tokenCount, setTokenCount] = useState<number>(0)
   const [loading, setLoading] = useState(true)
@@ -53,7 +51,7 @@ export default function ZealousSwapPage() {
     }
 
     fetchProtocolStats()
-  }, [currentNetwork])
+  }, [])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)
@@ -83,7 +81,7 @@ export default function ZealousSwapPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
           <div className="mb-6">

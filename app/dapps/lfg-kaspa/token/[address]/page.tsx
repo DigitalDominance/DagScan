@@ -12,12 +12,10 @@ import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import TokenPriceChart from "@/components/token-price-chart"
 import { LFGAPI, type LFGToken } from "@/lib/lfg-api"
-import { useNetwork } from "@/context/NetworkContext"
 
 export default function LFGTokenPage() {
   const params = useParams()
   const router = useRouter()
-  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [token, setToken] = useState<LFGToken | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -57,40 +55,40 @@ export default function LFGTokenPage() {
 
   const formatCurrency = (value: number) => {
     if (value >= 1e9) {
-      return `$${(value / 1e9).toFixed(2)}B`
+      return `${(value / 1e9).toFixed(2)}B`
     }
     if (value >= 1e6) {
-      return `$${(value / 1e6).toFixed(2)}M`
+      return `${(value / 1e6).toFixed(2)}M`
     } else if (value >= 1e3) {
-      return `$${(value / 1e3).toFixed(2)}K`
+      return `${(value / 1e3).toFixed(2)}K`
     }
     if (value >= 1) {
-      return `$${value.toFixed(6)}`
+      return `${value.toFixed(6)}`
     }
     if (value >= 0.001) {
-      return `$${value.toFixed(8)}`
+      return `${value.toFixed(8)}`
     }
-    return `$${value.toFixed(12)}`
+    return `${value.toFixed(12)}`
   }
 
   const formatPrice = (value: number) => {
     if (value >= 1) {
-      return `$${value.toFixed(4)}`
+      return `${value.toFixed(4)}`
     }
     if (value >= 0.01) {
-      return `$${value.toFixed(6)}`
+      return `${value.toFixed(6)}`
     }
     if (value >= 0.0001) {
-      return `$${value.toFixed(8)}`
+      return `${value.toFixed(8)}`
     }
-    return `$${value.toFixed(10)}`
+    return `${value.toFixed(10)}`
   }
 
   if (loading) {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-                    <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
           <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
             <div className="text-center py-20">
               <div className="text-white/70 font-rajdhani text-xl">Loading token data...</div>
@@ -106,7 +104,7 @@ export default function LFGTokenPage() {
     return (
       <BeamsBackground>
         <div className="min-h-screen flex flex-col font-inter">
-                    <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
           <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
             <div className="text-center py-20">
               <div className="text-red-400 font-rajdhani text-xl">{error || "Token not found"}</div>
@@ -127,7 +125,7 @@ export default function LFGTokenPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-                  <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
           <div className="mb-6">
@@ -203,7 +201,12 @@ export default function LFGTokenPage() {
                 <DollarSign className="h-3 w-3 lg:h-4 lg:w-4 text-green-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">{formatPrice(token.price)}</div>
+                <div className="flex items-center gap-1">
+                  <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4 lg:h-5 lg:w-5" />
+                  <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
+                    {formatPrice(token.price)}
+                  </div>
+                </div>
                 <div className="flex items-center gap-1 mt-1">
                   {token.priceChange["1d"] >= 0 ? (
                     <TrendingUp className="h-2 w-2 lg:h-3 lg:w-3 text-green-400" />
@@ -228,8 +231,11 @@ export default function LFGTokenPage() {
                 <TrendingUp className="h-3 w-3 lg:h-4 lg:w-4 text-blue-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
-                  {formatCurrency(token.marketCap)}
+                <div className="flex items-center gap-1">
+                  <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4 lg:h-5 lg:w-5" />
+                  <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
+                    {formatCurrency(token.marketCap)}
+                  </div>
                 </div>
                 <p className="text-xs text-blue-300 mt-1 font-inter">Total market value</p>
               </CardContent>
@@ -241,8 +247,11 @@ export default function LFGTokenPage() {
                 <Activity className="h-3 w-3 lg:h-4 lg:w-4 text-purple-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
-                  {formatCurrency(token.volume["1d"])}
+                <div className="flex items-center gap-1">
+                  <img src="/kaspa-logo.png" alt="KAS" className="h-4 w-4 lg:h-5 lg:w-5" />
+                  <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
+                    {formatCurrency(token.volume["1d"])}
+                  </div>
                 </div>
                 <p className="text-xs text-purple-300 mt-1 font-inter">24h trading volume</p>
               </CardContent>

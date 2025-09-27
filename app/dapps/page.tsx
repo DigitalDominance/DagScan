@@ -12,7 +12,6 @@ import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import { ZealousAPI, type ProtocolStats } from "@/lib/zealous-api"
 import { LFGAPI } from "@/lib/lfg-api"
-import { useNetwork } from "@/context/NetworkContext"
 
 interface DApp {
   id: string
@@ -32,7 +31,6 @@ interface DApp {
 const categories = ["All", "DEX", "Lending", "NFT", "Bridge", "Gaming", "DeFi"]
 
 export default function DAppsPage() {
-  const { currentNetwork, handleNetworkChange } = useNetwork();
   const [selectedCategory, setSelectedCategory] = useState("All")
   const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
   const [lfgStats, setLfgStats] = useState<{ totalTVL: number; totalVolume24h: number; totalTokens: number } | null>(
@@ -60,7 +58,7 @@ export default function DAppsPage() {
     }
 
     fetchStats()
-  }, [currentNetwork])
+  }, [])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)
@@ -155,7 +153,7 @@ export default function DAppsPage() {
   return (
     <BeamsBackground>
       <div className="min-h-screen flex flex-col font-inter">
-        <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />        
+        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
           {/* Header */}
