@@ -216,7 +216,7 @@ export default function DAppsPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8"
+            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
           >
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardContent className="p-4 text-center">
@@ -232,18 +232,12 @@ export default function DAppsPage() {
                 <div className="text-sm text-white/70 font-rajdhani">Total TVL</div>
               </CardContent>
             </Card>
-            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
+            <Card className="bg-black/40 border-white/20 backdrop-blur-xl md:col-span-1 col-span-1">
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-white font-orbitron">
                   {loading ? "..." : formatCurrency(combinedVolume)}
                 </div>
                 <div className="text-sm text-white/70 font-rajdhani">Total Volume</div>
-              </CardContent>
-            </Card>
-            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
-              <CardContent className="p-4 text-center">
-                <div className="text-2xl font-bold text-white font-orbitron">{loading ? "..." : combinedPools}</div>
-                <div className="text-sm text-white/70 font-rajdhani">Active Pools</div>
               </CardContent>
             </Card>
           </motion.div>
