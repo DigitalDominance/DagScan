@@ -306,7 +306,7 @@ export default function LFGTokenPage() {
                   <div>
                     <h4 className="text-white/70 font-rajdhani text-sm">Total Supply</h4>
                     <p className="text-white font-orbitron text-xs sm:text-sm lg:text-base">
-                      {token.totalSupply.toLocaleString()}
+                      {(token.totalSupply / Math.pow(10, token.decimals)).toLocaleString()}
                     </p>
                   </div>
                   <div>
