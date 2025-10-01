@@ -63,25 +63,30 @@ export default function LFGTokenPage() {
       return `${(value / 1e3).toFixed(2)}K`
     }
     if (value >= 1) {
-      return `${value.toFixed(6)}`
+      return value.toFixed(2)
     }
-    if (value >= 0.001) {
-      return `${value.toFixed(8)}`
+    // For small numbers, find first non-zero digit and show 2 more digits
+    const str = value.toString()
+    const match = str.match(/0\.0*/)
+    if (match) {
+      const zeros = match[0].length - 2 // subtract "0."
+      return value.toFixed(zeros + 2)
     }
-    return `${value.toFixed(12)}`
+    return value.toFixed(2)
   }
 
   const formatPrice = (value: number) => {
     if (value >= 1) {
-      return `${value.toFixed(4)}`
+      return value.toFixed(2)
     }
-    if (value >= 0.01) {
-      return `${value.toFixed(6)}`
+    // For small numbers, find first non-zero digit and show 2 more digits
+    const str = value.toString()
+    const match = str.match(/0\.0*/)
+    if (match) {
+      const zeros = match[0].length - 2 // subtract "0."
+      return value.toFixed(zeros + 2)
     }
-    if (value >= 0.0001) {
-      return `${value.toFixed(8)}`
-    }
-    return `${value.toFixed(10)}`
+    return value.toFixed(2)
   }
 
   if (loading) {
@@ -263,7 +268,9 @@ export default function LFGTokenPage() {
                 <Activity className="h-3 w-3 lg:h-4 lg:w-4 text-orange-400" />
               </CardHeader>
               <CardContent>
-                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">{token.progress}%</div>
+                <div className="text-sm lg:text-2xl font-bold text-white font-orbitron">
+                  {token.progress.toFixed(2)}%
+                </div>
                 <p className="text-xs text-orange-300 mt-1 font-inter">Bonding curve progress</p>
               </CardContent>
             </Card>
