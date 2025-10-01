@@ -24,13 +24,12 @@ interface EnhancedToken extends Token {
 }
 
 export default function VerifiedTokensList({ limit = 10, showPagination = true }: VerifiedTokensListProps) {
-  const [tokens, setTokens] = useState<EnhancedToken[]>([])
+  const [allTokens, setAllTokens] = useState<EnhancedToken[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [currentPage, setCurrentPage] = useState(1)
   const [sortBy, setSortBy] = useState<"priceUSD" | "marketCap" | "volume24h">("marketCap")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc")
-  const [totalTokens, setTotalTokens] = useState(0)
 
   const router = useRouter()
   const zealousAPI = new ZealousAPI()
@@ -68,9 +67,12 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     return `${sign}${value.toFixed(2)}%`
   }
 
-  const getTokenLogoUrl = (logoURI: string): string => {
+  const getTokenLogoUrl = (logoURI: string, source?: "zealous" | "lfg"): string => {
     if (!logoURI) return "/placeholder.svg?height=40&width=40"
     if (logoURI.startsWith("http")) return logoURI
+    if (source === "lfg") {
+      return `https://ipfs.io/ipfs/${logoURI}`
+    }
     return `https://testnet.zealousswap.com/images/${logoURI}`
   }
 
@@ -200,7 +202,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
   }
 
   useEffect(() => {
-    const fetchTokens = async () => {
+    const fetchAllTokens = async () => {
       try {
         setLoading(true)
         setError(null)
@@ -222,16 +224,8 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
           console.warn("Failed to fetch LFG graduated tokens:", lfgError)
         }
 
-        const combinedTokenCount = allZealousTokens.length + lfgGraduatedTokens.length
-        setTotalTokens(combinedTokenCount)
-
-        const offset = (currentPage - 1) * tokensPerPage
-
-        const allTokensForProcessing = [...allZealousTokens]
-
         const priorityTokens = ["WKAS", "KASPER"]
-        let tokensData = allTokensForProcessing.slice(offset, offset + tokensPerPage)
-        tokensData = tokensData.sort((a, b) => {
+        const sortedZealousTokens = allZealousTokens.sort((a, b) => {
           const aPriority = priorityTokens.includes(a.symbol) ? 0 : 1
           const bPriority = priorityTokens.includes(b.symbol) ? 0 : 1
           if (aPriority !== bPriority) {
@@ -241,10 +235,10 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
         })
 
         const batchSize = 3
-        const enhancedTokens = []
+        const enhancedZealousTokens = []
 
-        for (let i = 0; i < tokensData.length; i += batchSize) {
-          const batch = tokensData.slice(i, i + batchSize)
+        for (let i = 0; i < sortedZealousTokens.length; i += batchSize) {
+          const batch = sortedZealousTokens.slice(i, i + batchSize)
           const batchResults = await Promise.all(
             batch.map(async (token) => {
               try {
@@ -280,7 +274,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                   volume24h,
                   marketCap,
                   totalSupply,
-                  logoURI: getTokenLogoUrl(token.logoURI),
+                  logoURI: getTokenLogoUrl(token.logoURI, "zealous"),
                   source: "zealous" as const,
                 }
               } catch (tokenError) {
@@ -291,42 +285,23 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                   volume24h: Math.random() * 1000000,
                   marketCap: (token.priceUSD || 0) * 1000000000,
                   totalSupply: 1000000000,
-                  logoURI: getTokenLogoUrl(token.logoURI),
+                  logoURI: getTokenLogoUrl(token.logoURI, "zealous"),
                   source: "zealous" as const,
                 }
               }
             }),
           )
-          enhancedTokens.push(...batchResults)
+          enhancedZealousTokens.push(...batchResults)
         }
 
-        const allEnhancedTokens = [...enhancedTokens, ...lfgGraduatedTokens]
+        const lfgTokensWithLogos = lfgGraduatedTokens.map((token) => ({
+          ...token,
+          logoURI: getTokenLogoUrl(token.logoURI, "lfg"),
+        }))
 
-        const sortedTokens = allEnhancedTokens.sort((a, b) => {
-          let aValue: number, bValue: number
+        const combinedTokens = [...enhancedZealousTokens, ...lfgTokensWithLogos]
 
-          switch (sortBy) {
-            case "priceUSD":
-              aValue = a.priceUSD || 0
-              bValue = b.priceUSD || 0
-              break
-            case "marketCap":
-              aValue = a.marketCap || 0
-              bValue = b.marketCap || 0
-              break
-            case "volume24h":
-              aValue = a.volume24h || 0
-              bValue = b.volume24h || 0
-              break
-            default:
-              aValue = a.marketCap || 0
-              bValue = b.marketCap || 0
-          }
-
-          return sortOrder === "desc" ? bValue - aValue : aValue - bValue
-        })
-
-        setTokens(sortedTokens)
+        setAllTokens(combinedTokens)
       } catch (err) {
         console.error("Failed to fetch tokens:", err)
         setError("Failed to load tokens data")
@@ -335,8 +310,38 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
       }
     }
 
-    fetchTokens()
-  }, [currentPage, sortBy, sortOrder, tokensPerPage])
+    fetchAllTokens()
+  }, [])
+
+  const sortedTokens = [...allTokens].sort((a, b) => {
+    let aValue: number, bValue: number
+
+    switch (sortBy) {
+      case "priceUSD":
+        aValue = a.priceUSD || 0
+        bValue = b.priceUSD || 0
+        break
+      case "marketCap":
+        aValue = a.marketCap || 0
+        bValue = b.marketCap || 0
+        break
+      case "volume24h":
+        aValue = a.volume24h || 0
+        bValue = b.volume24h || 0
+        break
+      default:
+        aValue = a.marketCap || 0
+        bValue = b.marketCap || 0
+    }
+
+    return sortOrder === "desc" ? bValue - aValue : aValue - bValue
+  })
+
+  const totalTokens = sortedTokens.length
+  const totalPages = Math.ceil(totalTokens / tokensPerPage)
+  const startIndex = (currentPage - 1) * tokensPerPage
+  const endIndex = startIndex + tokensPerPage
+  const paginatedTokens = sortedTokens.slice(startIndex, endIndex)
 
   const handleSort = (column: "priceUSD" | "marketCap" | "volume24h") => {
     if (sortBy === column) {
@@ -363,7 +368,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     }
   }
 
-  const totalPages = Math.ceil(totalTokens / tokensPerPage)
   const hasNextPage = currentPage < totalPages
   const hasPrevPage = currentPage > 1
 
@@ -422,7 +426,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
             <div className="col-span-2">24h Volume</div>
           </div>
 
-          {tokens.map((token, index) => (
+          {paginatedTokens.map((token, index) => (
             <motion.div
               key={token.address}
               initial={{ opacity: 0, y: 20 }}
@@ -512,8 +516,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
         {showPagination && (
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
             <div className="text-white/50 text-sm font-rajdhani">
-              Showing {(currentPage - 1) * tokensPerPage + 1} to {Math.min(currentPage * tokensPerPage, totalTokens)} of{" "}
-              {totalTokens} tokens
+              Showing {startIndex + 1} to {Math.min(endIndex, totalTokens)} of {totalTokens} tokens
             </div>
             <div className="flex items-center gap-2">
               <Button
