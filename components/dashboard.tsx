@@ -424,7 +424,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
               <>
                 <div className="h-3 w-3 rounded-full bg-green-400 animate-pulse"></div>
                 <span className="text-white/70 font-rajdhani text-sm sm:text-base">
-                  Connected to {network === "kasplex" ? "Kasplex Testnet" : "Igra Network"}
+                  Connected to {network === "kasplex" ? "Kasplex" : "Igra Network"}
                 </span>
               </>
             )}
