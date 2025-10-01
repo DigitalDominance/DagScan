@@ -36,6 +36,7 @@ export default function DAppsPage() {
   const [lfgStats, setLfgStats] = useState<{ totalTVL: number; totalVolume24h: number; totalTokens: number } | null>(
     null,
   )
+  const [kasPrice, setKasPrice] = useState<number>(0)
   const [loading, setLoading] = useState(true)
   const router = useRouter()
   const zealousAPI = new ZealousAPI()
@@ -44,12 +45,31 @@ export default function DAppsPage() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [zealousStats, lfgCombinedStats] = await Promise.all([
+        const kasPriceResponse = await fetch("https://api.kaspa.org/info/price?stringOnly=false")
+        const kasPriceData = await kasPriceResponse.json()
+        const currentKasPrice = kasPriceData.price || 0
+        setKasPrice(currentKasPrice)
+
+        const [zealousResult, lfgResult] = await Promise.allSettled([
           zealousAPI.getProtocolStats(),
           lfgAPI.getCombinedStats(),
         ])
-        setProtocolStats(zealousStats)
-        setLfgStats(lfgCombinedStats)
+
+        if (zealousResult.status === "fulfilled") {
+          setProtocolStats(zealousResult.value)
+        } else {
+          console.error("Failed to fetch Zealous stats:", zealousResult.reason)
+        }
+
+        if (lfgResult.status === "fulfilled") {
+          setLfgStats({
+            totalTVL: lfgResult.value.totalTVL * currentKasPrice,
+            totalVolume24h: lfgResult.value.totalVolume24h * currentKasPrice,
+            totalTokens: lfgResult.value.totalTokens,
+          })
+        } else {
+          console.error("Failed to fetch LFG stats:", lfgResult.reason)
+        }
       } catch (error) {
         console.error("Failed to fetch protocol stats:", error)
       } finally {
@@ -72,15 +92,37 @@ export default function DAppsPage() {
     if (value === undefined || value === null || isNaN(value)) {
       return "$0.00"
     }
+
     if (value >= 1e9) {
       return `$${(value / 1e9).toFixed(2)}B`
     }
     if (value >= 1e6) {
       return `$${(value / 1e6).toFixed(2)}M`
-    } else if (value >= 1e3) {
+    }
+    if (value >= 1e3) {
       return `$${(value / 1e3).toFixed(2)}K`
     }
-    return `$${value.toFixed(2)}`
+
+    if (value >= 1) {
+      return `$${value.toFixed(2)}`
+    }
+
+    const str = value.toString()
+    const decimalIndex = str.indexOf(".")
+    if (decimalIndex === -1) return `$${value.toFixed(2)}`
+
+    let firstNonZeroIndex = -1
+    for (let i = decimalIndex + 1; i < str.length; i++) {
+      if (str[i] !== "0") {
+        firstNonZeroIndex = i
+        break
+      }
+    }
+
+    if (firstNonZeroIndex === -1) return `$${value.toFixed(2)}`
+
+    const decimals = firstNonZeroIndex - decimalIndex + 1
+    return `$${value.toFixed(decimals)}`
   }
 
   const dapps: DApp[] = [
@@ -156,7 +198,6 @@ export default function DAppsPage() {
         <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-7xl px-4 py-8">
-          {/* Header */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-4 font-orbitron">
               Kaspa EVM
@@ -171,7 +212,6 @@ export default function DAppsPage() {
             </p>
           </motion.div>
 
-          {/* Stats Overview */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -208,7 +248,6 @@ export default function DAppsPage() {
             </Card>
           </motion.div>
 
-          {/* Category Filter */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -231,7 +270,6 @@ export default function DAppsPage() {
             ))}
           </motion.div>
 
-          {/* DApps Grid */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -273,7 +311,6 @@ export default function DAppsPage() {
                   </CardHeader>
 
                   <CardContent className="pt-0">
-                    {/* Stats */}
                     <div className="grid grid-cols-3 gap-4 mb-4">
                       <div className="text-center">
                         <div className="flex items-center justify-center mb-1">
@@ -300,7 +337,6 @@ export default function DAppsPage() {
                       </div>
                     </div>
 
-                    {/* Features */}
                     <div className="mb-4">
                       <div className="text-xs text-white/50 font-rajdhani mb-2">Key Features:</div>
                       <div className="flex flex-wrap gap-1">
@@ -317,7 +353,6 @@ export default function DAppsPage() {
                       </div>
                     </div>
 
-                    {/* Action Button */}
                     <Button
                       className={`w-full bg-gradient-to-r ${dapp.gradient} text-white font-rajdhani font-semibold group-hover:shadow-lg transition-all duration-300`}
                       disabled={dapp.status === "coming-soon"}
