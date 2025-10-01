@@ -52,7 +52,7 @@ export default function ZealousPoolsTable({ limit = 10, showPagination = true }:
   const getTokenLogoUrl = (logoURI: string): string => {
     if (!logoURI) return "/placeholder.svg?height=40&width=40"
     if (logoURI.startsWith("http")) return logoURI
-    return `https://testnet.zealousswap.com/images/${logoURI}`
+    return `https://cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/${logoURI}`
   }
 
   const formatCurrency = (value: number | undefined | null) => {
