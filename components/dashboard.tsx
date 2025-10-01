@@ -403,7 +403,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
               <>
                 <div className="h-3 w-3 rounded-full bg-yellow-400 animate-pulse"></div>
                 <span className="text-white/70 font-rajdhani text-sm sm:text-base">
-                  Demo Mode - {network === "kasplex" ? "Kasplex Testnet" : "Igra Network"} (RPC Unavailable)
+                  Demo Mode - {network === "kasplex" ? "Kasplex" : "Igra Network"} (RPC Unavailable)
                 </span>
                 <Button
                   variant="ghost"
