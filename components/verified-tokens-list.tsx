@@ -6,9 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown, TrendingUp, TrendingDown } from "lucide-react"
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
+import { LFGAPI, type LFGToken } from "@/lib/lfg-api"
 import { KasplexAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { useNetwork } from "@/context/NetworkContext"
 
 interface VerifiedTokensListProps {
   limit?: number
@@ -20,11 +20,10 @@ interface EnhancedToken extends Token {
   volume24h: number
   marketCap: number
   totalSupply: number
+  source?: "zealous" | "lfg"
 }
 
 export default function VerifiedTokensList({ limit = 10, showPagination = true }: VerifiedTokensListProps) {
-  const { currentNetwork } = useNetwork();
-
   const [tokens, setTokens] = useState<EnhancedToken[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -35,7 +34,8 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
 
   const router = useRouter()
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI(currentNetwork)
+  const lfgAPI = new LFGAPI()
+  const kasplexAPI = new KasplexAPI("kasplex")
   const tokensPerPage = limit
 
   const formatCurrency = (value: number | undefined | null) => {
@@ -68,14 +68,12 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     return `${sign}${value.toFixed(2)}%`
   }
 
-  // Get token logo URL using the same logic as ZealousAPI
   const getTokenLogoUrl = (logoURI: string): string => {
     if (!logoURI) return "/placeholder.svg?height=40&width=40"
     if (logoURI.startsWith("http")) return logoURI
     return `https://testnet.zealousswap.com/images/${logoURI}`
   }
 
-  // Simplified token supply fetch with timeout
   const fetchTokenSupply = async (address: string): Promise<number> => {
     try {
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
@@ -101,13 +99,11 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     return Math.random() * 1000000000
   }
 
-  // Get 24hr change from chart data - this will be consistent with the chart
   const getChartPriceChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
     try {
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000))
 
-      // Use the same data source as the chart - get price history for 24 hours
-      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 2880, 0) // 2 days worth to ensure coverage
+      const priceHistoryPromise = zealousAPI.getTokenPrice(tokenAddress, 2880, 0)
       const priceHistory = await Promise.race([priceHistoryPromise, timeoutPromise])
 
       if (!priceHistory || priceHistory.length === 0) {
@@ -116,10 +112,8 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
 
       const now = new Date()
 
-      // Sort all prices by timestamp first to get chronological order (same as chart)
       priceHistory.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
-      // Filter to get only valid prices from the past (same as chart)
       const validPrices = priceHistory.filter((price) => {
         const priceDate = new Date(price.timestamp)
         const isValidPrice = typeof price.priceUSD === "number" && !isNaN(price.priceUSD) && price.priceUSD > 0
@@ -131,7 +125,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
         return Math.random() * 20 - 10
       }
 
-      // Get data from the most recent time backwards for 24H (same as chart)
       const mostRecentTime = new Date(validPrices[validPrices.length - 1].timestamp)
       const startTime = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000)
 
@@ -140,11 +133,9 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
         return priceDate >= startTime
       })
 
-      // If no data in the specific time range, get the most recent available data
       const finalPrices =
         filteredPrices.length === 0 ? validPrices.slice(-Math.min(100, validPrices.length)) : filteredPrices
 
-      // Calculate price change using first and last data points (EXACT same as chart)
       if (finalPrices.length > 1) {
         const oldPrice = finalPrices[0].priceUSD || 0
         const newPrice = finalPrices[finalPrices.length - 1].priceUSD || 0
@@ -160,7 +151,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     }
   }
 
-  // Simplified volume calculation with timeout
   const calculate24hrVolume = async (tokenAddress: string): Promise<number> => {
     try {
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
@@ -181,25 +171,66 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     }
   }
 
+  const fetchKasPrice = async (): Promise<number> => {
+    try {
+      const response = await fetch("https://api.kaspa.org/info/price?stringOnly=false")
+      const data = await response.json()
+      return data.price || 0.074792
+    } catch (error) {
+      console.warn("Failed to fetch KAS price:", error)
+      return 0.074792
+    }
+  }
+
+  const convertLFGToken = (lfgToken: LFGToken, kasPrice: number): EnhancedToken => {
+    return {
+      address: lfgToken.tokenAddress,
+      symbol: lfgToken.ticker,
+      name: lfgToken.name,
+      decimals: lfgToken.decimals,
+      logoURI: lfgToken.image,
+      priceUSD: lfgToken.price * kasPrice,
+      verified: true,
+      priceChange24h: lfgToken.priceChange["1d"],
+      volume24h: lfgToken.volume["1d"] * kasPrice,
+      marketCap: lfgToken.marketCap * kasPrice,
+      totalSupply: lfgToken.totalSupply,
+      source: "lfg",
+    }
+  }
+
   useEffect(() => {
     const fetchTokens = async () => {
       try {
         setLoading(true)
         setError(null)
 
-        // Fetch all tokens with timeout
+        const kasPrice = await fetchKasPrice()
+
         const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 8000))
 
-        const tokensPromise = zealousAPI.getTokens(500, 0) // Reduced from 1000
-        const allTokens = await Promise.race([tokensPromise, timeoutPromise])
+        const tokensPromise = zealousAPI.getTokens(500, 0)
+        const allZealousTokens = await Promise.race([tokensPromise, timeoutPromise])
 
-        setTotalTokens(allTokens.length)
+        let lfgGraduatedTokens: EnhancedToken[] = []
+        try {
+          const lfgResponse = await lfgAPI.getTokens(1, "Market Cap (High to Low)")
+          const graduatedTokens = lfgResponse.result.filter((token) => token.state === "graduated")
+          lfgGraduatedTokens = graduatedTokens.map((token) => convertLFGToken(token, kasPrice))
+          console.log(`[v0] Fetched ${lfgGraduatedTokens.length} graduated LFG tokens`)
+        } catch (lfgError) {
+          console.warn("Failed to fetch LFG graduated tokens:", lfgError)
+        }
+
+        const combinedTokenCount = allZealousTokens.length + lfgGraduatedTokens.length
+        setTotalTokens(combinedTokenCount)
 
         const offset = (currentPage - 1) * tokensPerPage
-        let tokensData = allTokens.slice(offset, offset + tokensPerPage)
 
-        // Prioritize WKAS and KASPER tokens
+        const allTokensForProcessing = [...allZealousTokens]
+
         const priorityTokens = ["WKAS", "KASPER"]
+        let tokensData = allTokensForProcessing.slice(offset, offset + tokensPerPage)
         tokensData = tokensData.sort((a, b) => {
           const aPriority = priorityTokens.includes(a.symbol) ? 0 : 1
           const bPriority = priorityTokens.includes(b.symbol) ? 0 : 1
@@ -209,7 +240,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
           return 0
         })
 
-        // Process tokens in smaller batches for better performance
         const batchSize = 3
         const enhancedTokens = []
 
@@ -218,10 +248,8 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
           const batchResults = await Promise.all(
             batch.map(async (token) => {
               try {
-                // Fetch token supply
                 const totalSupply = await fetchTokenSupply(token.address)
 
-                // Get current price
                 let currentPrice = token.priceUSD || 0
                 try {
                   const timeoutPromise = new Promise<never>((_, reject) =>
@@ -238,13 +266,11 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                   console.warn("Could not fetch current price, using token list price:", priceError)
                 }
 
-                // Calculate accurate 24hr price change and volume
                 const [priceChange24h, volume24h] = await Promise.all([
-                  getChartPriceChange(token.address, currentPrice), // Use chart-consistent calculation
+                  getChartPriceChange(token.address, currentPrice),
                   calculate24hrVolume(token.address),
                 ])
 
-                // Calculate market cap
                 const marketCap = currentPrice * totalSupply
 
                 return {
@@ -255,6 +281,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                   marketCap,
                   totalSupply,
                   logoURI: getTokenLogoUrl(token.logoURI),
+                  source: "zealous" as const,
                 }
               } catch (tokenError) {
                 console.warn(`Error processing token ${token.symbol}:`, tokenError)
@@ -265,6 +292,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                   marketCap: (token.priceUSD || 0) * 1000000000,
                   totalSupply: 1000000000,
                   logoURI: getTokenLogoUrl(token.logoURI),
+                  source: "zealous" as const,
                 }
               }
             }),
@@ -272,8 +300,9 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
           enhancedTokens.push(...batchResults)
         }
 
-        // Sort tokens based on current sort criteria
-        const sortedTokens = enhancedTokens.sort((a, b) => {
+        const allEnhancedTokens = [...enhancedTokens, ...lfgGraduatedTokens]
+
+        const sortedTokens = allEnhancedTokens.sort((a, b) => {
           let aValue: number, bValue: number
 
           switch (sortBy) {
@@ -327,7 +356,11 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
   }
 
   const handleTokenClick = (token: EnhancedToken) => {
-    router.push(`/tokens/${token.address}`)
+    if (token.source === "lfg") {
+      router.push(`/dapps/lfg-kaspa/token/${token.address}`)
+    } else {
+      router.push(`/tokens/${token.address}`)
+    }
   }
 
   const totalPages = Math.ceil(totalTokens / tokensPerPage)
@@ -367,7 +400,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {/* Header Row - Hidden on mobile, shown on larger screens */}
           <div className="hidden lg:grid lg:grid-cols-12 gap-4 text-white/50 text-sm font-rajdhani border-b border-white/10 pb-2">
             <div className="col-span-4">Token</div>
             <div className="col-span-2">
@@ -390,7 +422,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
             <div className="col-span-2">24h Volume</div>
           </div>
 
-          {/* Token Rows */}
           {tokens.map((token, index) => (
             <motion.div
               key={token.address}
@@ -400,7 +431,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
               className="grid grid-cols-1 lg:grid-cols-12 gap-4 p-4 bg-white/5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer"
               onClick={() => handleTokenClick(token)}
             >
-              {/* Token Info */}
               <div className="col-span-1 lg:col-span-4 flex items-center gap-4">
                 <img
                   src={token.logoURI || "/placeholder.svg"}
@@ -417,7 +447,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                 </div>
               </div>
 
-              {/* Mobile Layout - Stack vertically */}
               <div className="col-span-1 lg:col-span-8 lg:hidden space-y-3">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -450,19 +479,15 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                 </div>
               </div>
 
-              {/* Desktop Layout - Horizontal */}
               <div className="hidden lg:contents">
-                {/* Price */}
                 <div className="col-span-2">
                   <div className="text-white font-orbitron">{formatCurrency(token.priceUSD)}</div>
                 </div>
 
-                {/* Market Cap */}
                 <div className="col-span-2">
                   <div className="text-white font-orbitron">{formatCurrency(token.marketCap)}</div>
                 </div>
 
-                {/* 24h Change */}
                 <div className="col-span-2">
                   <div
                     className={`font-orbitron flex items-center gap-1 ${(token.priceChange24h || 0) >= 0 ? "text-purple-400" : "text-pink-400"}`}
@@ -476,7 +501,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
                   </div>
                 </div>
 
-                {/* 24h Volume */}
                 <div className="col-span-2">
                   <div className="text-white/70 font-orbitron">{formatCurrency(token.volume24h)}</div>
                 </div>
@@ -485,7 +509,6 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
           ))}
         </div>
 
-        {/* Pagination at bottom */}
         {showPagination && (
           <div className="flex items-center justify-between mt-6 pt-4 border-t border-white/10">
             <div className="text-white/50 text-sm font-rajdhani">
