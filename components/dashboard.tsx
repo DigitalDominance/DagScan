@@ -604,7 +604,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                 <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-purple-500/30">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                      Latest Block
+                      Latest L2 Block
                     </CardTitle>
                     <Cube className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
                   </CardHeader>
@@ -618,7 +618,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                 <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-blue-500/30">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                      Total Addresses
+                      Total L2 Addresses
                     </CardTitle>
                     <Wallet className="h-3 w-3 sm:h-4 sm:w-4 text-blue-400" />
                   </CardHeader>
