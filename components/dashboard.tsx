@@ -455,14 +455,17 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
           <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
             <CardHeader className="pb-3">
               {
-              currentNetwork === 'kasplex' ? <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
-                <img src="/kaspa-logo.png" alt="Kaspa" className="h-5 w-5" />
-                Kaspa Market Data
-              </CardTitle> :
-              <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
-                <img src="/igra_logo.png" alt="Kaspa" className="h-5 w-5" />
-                Igra Market Data
-              </CardTitle>              
+                currentNetwork === 'kasplex' ? (
+                  <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
+                    <img src="/kaspa-logo.png" alt="Kaspa" className="h-5 w-5" />
+                    Kaspa Market Data
+                  </CardTitle>
+                ) : (
+                  <CardTitle className="text-white flex items-center gap-2 font-rajdhani">
+                    <img src="/igra_logo.png" alt="Kaspa" className="h-5 w-5" />
+                    Igra Market Data
+                  </CardTitle>
+                )
               }
             </CardHeader>
             <CardContent className="space-y-4">
@@ -477,25 +480,15 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                         {currentNetwork === 'kasplex' ? 'KAS Price' : 'iKAS Price'}
                       </CardTitle>
                       {currentNetwork === 'kasplex' ? (
-                        <img
-                          src="/kaspa-logo.png"
-                          alt="Kaspa"
-                          className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0"
-                        />
+                        <img src="/kaspa-logo.png" alt="Kaspa" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                       ) : (
-                        <img
-                          src="/igra_logo.png"
-                          alt="Igra"
-                          className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0"
-                        />
+                        <img src="/igra_logo.png" alt="Igra" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                       )}
                     </CardHeader>
                     <CardContent className="px-2 sm:px-6 pb-2 sm:pb-6">
                       <div className="flex flex-col">
                         <div className="text-sm sm:text-2xl font-bold text-white font-orbitron">
-                          {kasplexStats
-                            ? formatPrice(kasplexStats.coin_price || '0.0000')
-                            : "$0.0000"}
+                          {kasplexStats ? formatPrice(kasplexStats.coin_price || '0.0000') : "$0.0000"}
                         </div>
                         {kasplexStats && (
                           <div className="flex items-center">
@@ -505,8 +498,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                       </div>
                     </CardContent>
                   </Card>
-                </div>
-              </div>
+
 
 
                   {/* Market Cap Card */}
