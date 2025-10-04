@@ -470,22 +470,32 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
               <div className="space-y-3 sm:space-y-0">
                 {/* First row: KAS Price and Market Cap */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-4 lg:gap-6">
-                  {/* KAS Price Card */}
+                  {/* KAS / iKAS Price Card */}
                   <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-green-500/30">
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 px-2 sm:px-6 pt-2 sm:pt-6">
                       <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani truncate">
-                        {/* {currentNetwork === 'kasplex' ? 'KAS Price' : 'Igra Price'} */}
-                        iKAS Price
+                        {currentNetwork === 'kasplex' ? 'KAS Price' : 'iKAS Price'}
                       </CardTitle>
-                      { currentNetwork === 'kasplex' ? <img src="/kaspa-logo.png" alt="Kaspa" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                      :
-                      <img src="/igra_logo.png" alt="Igra" className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
-                      }
+                      {currentNetwork === 'kasplex' ? (
+                        <img
+                          src="/kaspa-logo.png"
+                          alt="Kaspa"
+                          className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0"
+                        />
+                      ) : (
+                        <img
+                          src="/igra_logo.png"
+                          alt="Igra"
+                          className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0"
+                        />
+                      )}
                     </CardHeader>
                     <CardContent className="px-2 sm:px-6 pb-2 sm:pb-6">
                       <div className="flex flex-col">
                         <div className="text-sm sm:text-2xl font-bold text-white font-orbitron">
-                          {kasplexStats ? formatPrice(kasplexStats.coin_price || '0.0000') : "$0.0000"}
+                          {kasplexStats
+                            ? formatPrice(kasplexStats.coin_price || '0.0000')
+                            : "$0.0000"}
                         </div>
                         {kasplexStats && (
                           <div className="flex items-center">
@@ -495,6 +505,9 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                       </div>
                     </CardContent>
                   </Card>
+                </div>
+              </div>
+
 
                   {/* Market Cap Card */}
                   <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-purple-500/30">
@@ -641,7 +654,7 @@ export default function Dashboard({ network, searchQuery, onSearchResult }: Dash
                 <Card className="bg-slate-900/50 backdrop-blur-sm shadow-lg border-2 border-indigo-500/30">
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                      Gas Price
+                      L2 Gas Price
                     </CardTitle>
                     <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-indigo-400" />
                   </CardHeader>
