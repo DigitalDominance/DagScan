@@ -24,8 +24,8 @@ import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import { ZealousAPI, type Pool, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
-import { isBridgedToken, getBridgedTokenTicker } from "@/lib/bridged-tokens-config"
 import { KRC20API } from "@/lib/krc20-api"
+import { isBridgedToken, getBridgedTokenTicker } from "@/lib/bridged-tokens-config"
 
 interface TokenInfo extends Token {
   priceChange24h: number
@@ -56,7 +56,6 @@ export default function TokenPage() {
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
-  const krc20API = new KRC20API()
 
   const fetchAllTokens = async (): Promise<TokenApiInfo[]> => {
     try {
@@ -77,7 +76,7 @@ export default function TokenPage() {
   const getTokenLogoUrl = (logoURI: string): string => {
     if (!logoURI) return "/placeholder.svg?height=40&width=40"
     if (logoURI.startsWith("http")) return logoURI
-    return `https://testnet.zealousswap.com/images/${logoURI}`
+    return `https://cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/${logoURI}`
   }
 
   const formatCurrency = (value: number | undefined | null) => {
@@ -113,15 +112,15 @@ export default function TokenPage() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
-  const fetchTokenSupply = async (address: string, symbol?: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string): Promise<number> => {
     try {
       if (isBridgedToken(address)) {
         const ticker = getBridgedTokenTicker(address)
         if (ticker) {
           try {
+            const krc20API = new KRC20API()
             const krc20Supply = await krc20API.getMaxSupply(ticker)
             if (krc20Supply > 0) {
-              console.log(`[v0] Using KRC20 supply for ${ticker}: ${krc20Supply}`)
               return krc20Supply
             }
           } catch (krc20Error) {
@@ -214,7 +213,7 @@ export default function TokenPage() {
           throw new Error("Token not found")
         }
 
-        const totalSupply = await fetchTokenSupply(tokenAddress, token.symbol)
+        const totalSupply = await fetchTokenSupply(tokenAddress)
 
         let currentPrice = token.priceUSD || 0
         try {
