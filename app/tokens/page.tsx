@@ -13,6 +13,8 @@ import { ZealousAPI } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { useNetwork } from "@/context/NetworkContext"
 import { LFGAPI, type LFGToken } from "@/lib/lfg-api"
+import { isBridgedToken, getTickerFromAddress } from "@/lib/bridged-tokens-config"
+import { krc20API } from "@/lib/krc20-api"
 
 interface TokenStats {
   verifiedTokenCount: number
@@ -77,8 +79,24 @@ export default function TokensPage() {
     return `https://cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/${logoURI}`
   }
 
-  const fetchTokenSupply = async (address: string, symbol: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string, allZealousTokens: any[]): Promise<number> => {
     try {
+      const token = allZealousTokens.find((t) => t.address.toLowerCase() === address.toLowerCase())
+      const symbol = token?.symbol || ""
+
+      if (isBridgedToken(address) || isBridgedToken(symbol)) {
+        const ticker = symbol || getTickerFromAddress(address)
+        if (ticker) {
+          console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
+          const krc20Supply = await krc20API.getMaxSupply(ticker)
+          if (krc20Supply !== null) {
+            console.log(`[v0] Using KRC20 supply for ${ticker}: ${krc20Supply.toLocaleString()}`)
+            return krc20Supply
+          }
+          console.warn(`[v0] Failed to get KRC20 supply for ${ticker}, falling back to RPC`)
+        }
+      }
+
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
 
       const totalSupplyMethodId = "0x18160ddd"
@@ -246,7 +264,7 @@ export default function TokensPage() {
           const batchResults = await Promise.all(
             batch.map(async (token) => {
               try {
-                const totalSupply = await fetchTokenSupply(token.address, token.symbol)
+                const totalSupply = await fetchTokenSupply(token.address, allZealousTokens)
 
                 let currentPrice = token.priceUSD || 0
                 try {
