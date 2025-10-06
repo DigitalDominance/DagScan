@@ -13,7 +13,6 @@ import {
   DollarSign,
   Activity,
   BarChart3,
-  Calendar,
   Copy,
   CheckCircle,
   ExternalLink,
@@ -23,9 +22,10 @@ import {
 import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
-import TokenPriceChart from "@/components/token-price-chart"
 import { ZealousAPI, type Pool, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
+import { isBridgedToken, getBridgedTokenTicker } from "@/lib/bridged-tokens-config"
+import { KRC20API } from "@/lib/krc20-api"
 
 interface TokenInfo extends Token {
   priceChange24h: number
@@ -56,6 +56,7 @@ export default function TokenPage() {
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
+  const krc20API = new KRC20API()
 
   const fetchAllTokens = async (): Promise<TokenApiInfo[]> => {
     try {
@@ -76,7 +77,7 @@ export default function TokenPage() {
   const getTokenLogoUrl = (logoURI: string): string => {
     if (!logoURI) return "/placeholder.svg?height=40&width=40"
     if (logoURI.startsWith("http")) return logoURI
-    return `https://cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/${logoURI}`
+    return `https://testnet.zealousswap.com/images/${logoURI}`
   }
 
   const formatCurrency = (value: number | undefined | null) => {
@@ -112,10 +113,23 @@ export default function TokenPage() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
-  // Fetch token supply from RPC
-  const fetchTokenSupply = async (address: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string, symbol?: string): Promise<number> => {
     try {
-      // ERC20 totalSupply() method signature
+      if (isBridgedToken(address)) {
+        const ticker = getBridgedTokenTicker(address)
+        if (ticker) {
+          try {
+            const krc20Supply = await krc20API.getMaxSupply(ticker)
+            if (krc20Supply > 0) {
+              console.log(`[v0] Using KRC20 supply for ${ticker}: ${krc20Supply}`)
+              return krc20Supply
+            }
+          } catch (krc20Error) {
+            console.warn(`Failed to fetch KRC20 supply for ${ticker}, falling back to RPC:`, krc20Error)
+          }
+        }
+      }
+
       const totalSupplyMethodId = "0x18160ddd"
 
       const result = await kasplexAPI.rpcCall("eth_call", [
@@ -127,25 +141,20 @@ export default function TokenPage() {
       ])
 
       if (result && result !== "0x") {
-        // Convert hex to decimal and adjust for decimals (assuming 18 decimals)
         const supply = Number.parseInt(result, 16) / Math.pow(10, 18)
         return supply
       }
 
-      // Fallback to mock supply if RPC call fails
       return Math.random() * 1000000000
     } catch (error) {
       console.warn("Failed to fetch token supply from RPC:", error)
-      // Return mock supply as fallback
       return Math.random() * 1000000000
     }
   }
 
-  // Calculate accurate 24hr price change from historical data
   const getChartPriceChange = async (tokenAddress: string, currentPrice: number): Promise<number> => {
     try {
       const now = new Date()
-      // Get 2 days worth of data to ensure coverage
       const limit = 2880
       const prices = await zealousAPI.getTokenPrice(tokenAddress, limit, 0)
 
@@ -153,10 +162,8 @@ export default function TokenPage() {
         return 0
       }
 
-      // Sort all prices by timestamp first to get chronological order
       prices.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
 
-      // Filter to get only valid prices from the past
       const validPrices = prices.filter((price) => {
         const priceDate = new Date(price.timestamp)
         const isValidPrice = typeof price.priceUSD === "number" && !isNaN(price.priceUSD) && price.priceUSD > 0
@@ -168,7 +175,6 @@ export default function TokenPage() {
         return 0
       }
 
-      // Get data from the most recent time backwards 24 hours
       const mostRecentTime = new Date(validPrices[validPrices.length - 1].timestamp)
       const startTime = new Date(mostRecentTime.getTime() - 24 * 60 * 60 * 1000)
 
@@ -177,12 +183,10 @@ export default function TokenPage() {
         return priceDate >= startTime
       })
 
-      // If no data in the specific time range, get the most recent available data
       if (filteredPrices.length === 0) {
         filteredPrices = validPrices.slice(-Math.min(100, validPrices.length))
       }
 
-      // Calculate price change using first and last data points from filtered array
       if (filteredPrices.length > 1) {
         const oldPrice = filteredPrices[0].priceUSD || 0
         const newPrice = filteredPrices[filteredPrices.length - 1].priceUSD || 0
@@ -203,7 +207,6 @@ export default function TokenPage() {
       try {
         setLoading(true)
 
-        // First, try to get token from the tokens API
         const tokens = await zealousAPI.getTokens(1000, 0)
         const token = tokens.find((t) => t.address.toLowerCase() === tokenAddress.toLowerCase())
 
@@ -211,10 +214,8 @@ export default function TokenPage() {
           throw new Error("Token not found")
         }
 
-        // Fetch token supply from RPC
-        const totalSupply = await fetchTokenSupply(tokenAddress)
+        const totalSupply = await fetchTokenSupply(tokenAddress, token.symbol)
 
-        // Get current price
         let currentPrice = token.priceUSD || 0
         try {
           const currentPriceData = await zealousAPI.getCurrentTokenPrice(tokenAddress)
@@ -225,10 +226,8 @@ export default function TokenPage() {
           console.warn("Could not fetch current price, using token list price:", priceError)
         }
 
-        // Calculate accurate 24hr price change
         const priceChange24h = await getChartPriceChange(tokenAddress, currentPrice)
 
-        // Get all pools to find ones containing this token
         const allPools = await zealousAPI.getLatestPools(100, 0, "tvl", "desc")
         const tokenPools = allPools.filter(
           (pool) =>
@@ -236,10 +235,8 @@ export default function TokenPage() {
             pool.token1.address.toLowerCase() === tokenAddress.toLowerCase(),
         )
 
-        // Fetch all tokens to get logo information
         const allTokens = await fetchAllTokens()
 
-        // Create a map of token addresses to logo URLs
         const logoMap: Record<string, string> = {}
         allTokens.forEach((tokenData) => {
           const address = tokenData.address.toLowerCase()
@@ -248,7 +245,6 @@ export default function TokenPage() {
             : "/placeholder.svg?height=40&width=40"
         })
 
-        // Process pools with fetched logos
         const processedPools = tokenPools.map((pool) => ({
           ...pool,
           token0: {
@@ -261,15 +257,13 @@ export default function TokenPage() {
           },
         }))
 
-        // Calculate aggregated stats
         const volume24h = processedPools.reduce((sum, pool) => sum + (pool.volumeUSD || 0), 0)
 
-        // Calculate market cap with real supply and current price
         const marketCap = currentPrice * totalSupply
 
         setTokenInfo({
           ...token,
-          priceUSD: currentPrice, // Use the fetched current price
+          priceUSD: currentPrice,
           priceChange24h,
           volume24h,
           marketCap,
@@ -303,7 +297,6 @@ export default function TokenPage() {
     }
   }
 
-  // Pagination for pools
   const paginatedPools = tokenInfo?.pools.slice((poolsPage - 1) * poolsPerPage, poolsPage * poolsPerPage) || []
 
   const totalPoolsPages = Math.ceil((tokenInfo?.pools.length || 0) / poolsPerPage)
@@ -349,8 +342,7 @@ export default function TokenPage() {
       <div className="min-h-screen flex flex-col font-inter overflow-x-hidden">
         <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
 
-        <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden w-full">
-          {/* Header */}
+        <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden w-full max-w-full">
           <div className="mb-6">
             <Button
               variant="ghost"
@@ -424,7 +416,6 @@ export default function TokenPage() {
             </motion.div>
           </div>
 
-          {/* Token Stats - 2 per row on mobile */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -486,40 +477,9 @@ export default function TokenPage() {
             </Card>
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                  Active Pools
-                </CardTitle>
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
-                  {tokenInfo.pools.length}
-                </div>
-                <p className="text-xs text-purple-300 mt-1 font-inter">Liquidity pools</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Price Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-8 w-full max-w-full overflow-hidden"
-            data-chart
-          >
-            <TokenPriceChart tokenAddress={tokenAddress} tokenSymbol={tokenInfo.symbol} />
-          </motion.div>
-
-          {/* Token Pools */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <CardTitle className="text-white font-orbitron text-center sm:text-left">
-                    Pools Containing {tokenInfo.symbol}
-                  </CardTitle>
+                  <CardTitle className="text-white font-orbitron text-center sm:text-left">Active Pools</CardTitle>
                   {totalPoolsPages > 1 && (
                     <div className="flex items-center justify-center sm:justify-end gap-2">
                       <Button
