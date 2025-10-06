@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation"
 import { motion } from "motion/react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import {
   ArrowLeft,
   TrendingUp,
@@ -21,14 +22,17 @@ import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
 import TokenPriceChart from "@/components/token-price-chart"
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
+import { LFGAPI } from "@/lib/lfg-api"
 import { KasplexAPI } from "@/lib/api"
-import { useNetwork } from "@/context/NetworkContext"
+import { isBridgedToken, getTickerFromAddress } from "@/lib/bridged-tokens-config"
+import { krc20API } from "@/lib/krc20-api"
 
 interface TokenInfo extends Token {
   priceChange24h: number
   volume24h: number
   marketCap: number
   totalSupply: number
+  platform: "zealous" | "lfg"
 }
 
 interface ChartData {
@@ -38,17 +42,18 @@ interface ChartData {
 export default function TokenPage() {
   const params = useParams()
   const router = useRouter()
-  const { currentNetwork, handleNetworkChange } = useNetwork()
   const [tokenInfo, setTokenInfo] = useState<TokenInfo | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [copiedAddress, setCopiedAddress] = useState(false)
   const [chartPriceChange, setChartPriceChange] = useState<number | null>(null)
   const chartDataRef = useRef<ChartData | null>(null)
+  const [kasPrice, setKasPrice] = useState<number>(0)
 
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI(currentNetwork)
+  const lfgAPI = new LFGAPI()
+  const kasplexAPI = new KasplexAPI("kasplex")
 
   const formatCurrency = (value: number | undefined | null) => {
     if (value === undefined || value === null || isNaN(value)) {
@@ -63,12 +68,15 @@ export default function TokenPage() {
       return `$${(value / 1e3).toFixed(2)}K`
     }
     if (value >= 1) {
-      return `$${value.toFixed(4)}`
+      return `$${value.toFixed(2)}`
     }
-    if (value >= 0.001) {
-      return `$${value.toFixed(6)}`
+    const str = value.toString()
+    const match = str.match(/0\.0*[1-9]/)
+    if (match) {
+      const zeros = match[0].length - 2
+      return `$${value.toFixed(zeros + 2)}`
     }
-    return `$${value.toFixed(8)}`
+    return `$${value.toFixed(2)}`
   }
 
   const formatPercent = (value: number | undefined | null) => {
@@ -90,9 +98,22 @@ export default function TokenPage() {
     return `https://testnet.zealousswap.com/images/${logoURI}`
   }
 
-  // Simplified token supply fetch with timeout
-  const fetchTokenSupply = async (address: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string, symbol?: string): Promise<number> => {
     try {
+      // Check if this is a bridged token
+      if (isBridgedToken(address) || (symbol && isBridgedToken(symbol))) {
+        const ticker = symbol || getTickerFromAddress(address)
+        if (ticker) {
+          console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
+          const krc20Supply = await krc20API.getMaxSupply(ticker)
+          if (krc20Supply !== null) {
+            return krc20Supply
+          }
+          console.warn(`[v0] Failed to get KRC20 supply for ${ticker}, falling back to RPC`)
+        }
+      }
+
+      // Fall back to RPC for non-bridged tokens
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
 
       const totalSupplyMethodId = "0x18160ddd"
@@ -203,12 +224,69 @@ export default function TokenPage() {
     }
   }
 
+  const fetchKasPrice = async (): Promise<number> => {
+    try {
+      const response = await fetch("https://api.kaspa.org/info/price?stringOnly=false")
+      const data = await response.json()
+      return data.price || 0
+    } catch (error) {
+      console.error("Failed to fetch KAS price:", error)
+      return 0
+    }
+  }
+
+  const fetchLFGTokenData = async (address: string, kasPrice: number): Promise<TokenInfo | null> => {
+    try {
+      const response = await lfgAPI.searchTokens(address, 1)
+      const lfgToken = response.result?.find((t) => t.tokenAddress.toLowerCase() === address.toLowerCase())
+
+      if (!lfgToken) return null
+
+      // Convert KAS values to USD
+      const priceUSD = lfgToken.price * kasPrice
+      const marketCapUSD = lfgToken.marketCap * kasPrice
+      const volumeUSD = lfgToken.volume["1d"] * kasPrice
+
+      // Resolve logo URL
+      let logoURI = lfgToken.image
+      if (logoURI && !logoURI.startsWith("http")) {
+        logoURI = `https://ipfs.io/ipfs/${logoURI}`
+      }
+
+      return {
+        address: lfgToken.tokenAddress,
+        name: lfgToken.name,
+        symbol: lfgToken.ticker,
+        logoURI: logoURI || "/placeholder.svg?height=64&width=64",
+        priceUSD,
+        priceChange24h: lfgToken.priceChange["1d"],
+        volume24h: volumeUSD,
+        marketCap: marketCapUSD,
+        totalSupply: lfgToken.totalSupply,
+        platform: "lfg",
+      }
+    } catch (error) {
+      console.error("Failed to fetch LFG token:", error)
+      return null
+    }
+  }
+
   useEffect(() => {
     const fetchTokenInfoData = async () => {
       try {
         setLoading(true)
 
-        // Add timeout to prevent long loading
+        const currentKasPrice = await fetchKasPrice()
+        setKasPrice(currentKasPrice)
+
+        const lfgTokenData = await fetchLFGTokenData(tokenAddress, currentKasPrice)
+        if (lfgTokenData) {
+          setTokenInfo(lfgTokenData)
+          setChartPriceChange(lfgTokenData.priceChange24h)
+          setLoading(false)
+          return
+        }
+
         const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000))
 
         const tokensPromise = zealousAPI.getTokens(1000, 0)
@@ -220,7 +298,6 @@ export default function TokenPage() {
           throw new Error("Token not found")
         }
 
-        // Get current price first
         let currentPrice = token.priceUSD || 0
         try {
           const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 3000))
@@ -235,16 +312,14 @@ export default function TokenPage() {
           console.warn("Could not fetch current price, using token list price:", priceError)
         }
 
-        // Fetch data in parallel with timeouts
         const [totalSupply, priceChange24h, volume24h] = await Promise.all([
-          fetchTokenSupply(tokenAddress),
-          getChartPriceChange(tokenAddress, currentPrice), // Use chart-consistent calculation
+          fetchTokenSupply(tokenAddress, token.symbol),
+          getChartPriceChange(tokenAddress, currentPrice),
           calculate24hrVolume(tokenAddress),
         ])
 
         const marketCap = currentPrice * totalSupply
 
-        // Store the chart price change for consistency
         setChartPriceChange(priceChange24h)
         chartDataRef.current = { priceChange24h }
 
@@ -256,6 +331,7 @@ export default function TokenPage() {
           marketCap,
           totalSupply,
           logoURI: getTokenLogoUrl(token.logoURI),
+          platform: "zealous",
         })
       } catch (err) {
         console.error("Failed to fetch token info:", err)
@@ -268,7 +344,7 @@ export default function TokenPage() {
     if (tokenAddress) {
       fetchTokenInfoData()
     }
-  }, [tokenAddress, currentNetwork])
+  }, [tokenAddress])
 
   const handleSearch = (query: string) => {
     router.push(`/search/${encodeURIComponent(query)}`)
@@ -288,14 +364,17 @@ export default function TokenPage() {
     return `https://testnet.zealousswap.com/swap?from=KAS&to=${tokenAddress}`
   }
 
-  // Use the chart-consistent price change
+  const getLFGTradeUrl = (tokenAddress: string) => {
+    return `https://lfg.kaspa.com/token/${tokenAddress}`
+  }
+
   const displayPriceChange = chartPriceChange !== null ? chartPriceChange : tokenInfo?.priceChange24h || 0
 
   if (loading) {
     return (
       <CosmicBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center px-4">
             <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-500 mx-auto mb-4"></div>
@@ -312,7 +391,7 @@ export default function TokenPage() {
     return (
       <CosmicBackground>
         <div className="min-h-screen flex flex-col font-inter">
-          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+          <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
           <main className="flex-1 flex items-center justify-center px-4">
             <div className="text-center">
               <p className="text-red-400 font-inter mb-4">{error || "Token not found"}</p>
@@ -330,7 +409,7 @@ export default function TokenPage() {
   return (
     <CosmicBackground>
       <div className="min-h-screen flex flex-col font-inter overflow-x-hidden">
-          <Navigation currentNetwork={currentNetwork} onNetworkChange={handleNetworkChange} onSearch={handleSearch} />
+        <Navigation currentNetwork="kasplex" onNetworkChange={() => {}} onSearch={handleSearch} />
 
         <main className="flex-1 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-4 sm:py-8 overflow-x-hidden w-full">
           {/* Header */}
@@ -366,7 +445,7 @@ export default function TokenPage() {
                   <p className="text-white/70 font-rajdhani text-sm sm:text-base lg:text-lg truncate">
                     {tokenInfo.name}
                   </p>
-                  <div className="flex items-center justify-center sm:justify-start gap-2 mt-2">
+                  <div className="flex items-center justify-center sm:justify-start gap-2 mt-2 flex-wrap">
                     <code className="text-white/50 text-xs sm:text-sm font-mono bg-white/10 px-2 py-1 rounded truncate max-w-[200px]">
                       {formatAddress(tokenInfo.address)}
                     </code>
@@ -382,6 +461,15 @@ export default function TokenPage() {
                         <Copy className="h-3 w-3" />
                       )}
                     </Button>
+                    <Badge
+                      className={`text-xs ${
+                        tokenInfo.platform === "lfg"
+                          ? "bg-green-500/20 text-green-300 border-green-500/30"
+                          : "bg-purple-500/20 text-purple-300 border-purple-500/30"
+                      }`}
+                    >
+                      {tokenInfo.platform === "lfg" ? "LFG Token" : "Zealous Token"}
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -458,10 +546,13 @@ export default function TokenPage() {
             className="mb-8 w-full max-w-full overflow-hidden"
             data-chart
           >
-            <TokenPriceChart tokenAddress={tokenAddress} tokenSymbol={tokenInfo.symbol} />
+            <TokenPriceChart
+              tokenAddress={tokenAddress}
+              tokenSymbol={tokenInfo.symbol}
+              apiType={tokenInfo.platform === "lfg" ? "lfg" : undefined}
+            />
           </motion.div>
 
-          {/* Trade Card */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -477,18 +568,39 @@ export default function TokenPage() {
               <CardContent>
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
-                    <img src="/zealous-logo.png" alt="Zealous Swap" className="h-12 w-12 rounded-lg" />
-                    <div>
-                      <h3 className="text-white font-orbitron font-semibold">Zealous Swap</h3>
-                      <p className="text-white/70 font-rajdhani text-sm">Decentralized Exchange</p>
-                    </div>
+                    {tokenInfo.platform === "lfg" ? (
+                      <>
+                        <img src="/lfg-logo.png" alt="LFG" className="h-12 w-12 rounded-lg" />
+                        <div>
+                          <h3 className="text-white font-orbitron font-semibold">LFG Kaspa</h3>
+                          <p className="text-white/70 font-rajdhani text-sm">Launchpad Platform</p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <img src="/zealous-logo.png" alt="Zealous Swap" className="h-12 w-12 rounded-lg" />
+                        <div>
+                          <h3 className="text-white font-orbitron font-semibold">Zealous Swap</h3>
+                          <p className="text-white/70 font-rajdhani text-sm">Decentralized Exchange</p>
+                        </div>
+                      </>
+                    )}
                   </div>
                   <Button
                     className="bg-black/40 border-white/10 backdrop-blur-sm text-white font-orbitron hover:bg-black/60 w-full sm:w-auto"
-                    onClick={() => window.open(getZealousSwapUrl(tokenInfo.address), "_blank")}
+                    onClick={() =>
+                      window.open(
+                        tokenInfo.platform === "lfg"
+                          ? getLFGTradeUrl(tokenInfo.address)
+                          : getZealousSwapUrl(tokenInfo.address),
+                        "_blank",
+                      )
+                    }
                   >
                     <ArrowUpRight className="h-4 w-4 mr-2" />
-                    <span className="hidden sm:inline">Trade on Zealous</span>
+                    <span className="hidden sm:inline">
+                      Trade on {tokenInfo.platform === "lfg" ? "LFG" : "Zealous"}
+                    </span>
                     <span className="sm:hidden">Trade</span>
                   </Button>
                 </div>
