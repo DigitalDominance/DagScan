@@ -26,6 +26,8 @@ import Footer from "@/components/footer"
 import TokenPriceChart from "@/components/token-price-chart"
 import { ZealousAPI, type Pool, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
+import { KRC20API } from "@/lib/krc20-api"
+import { isBridgedToken, getBridgedTokenTicker } from "@/lib/bridged-tokens-config"
 
 interface TokenInfo extends Token {
   priceChange24h: number
@@ -115,6 +117,21 @@ export default function TokenPage() {
   // Fetch token supply from RPC
   const fetchTokenSupply = async (address: string): Promise<number> => {
     try {
+      if (isBridgedToken(address)) {
+        const ticker = getBridgedTokenTicker(address)
+        if (ticker) {
+          try {
+            const krc20API = new KRC20API()
+            const krc20Supply = await krc20API.getMaxSupply(ticker)
+            if (krc20Supply > 0) {
+              return krc20Supply
+            }
+          } catch (krc20Error) {
+            console.warn(`Failed to fetch KRC20 supply for ${ticker}, falling back to RPC:`, krc20Error)
+          }
+        }
+      }
+
       // ERC20 totalSupply() method signature
       const totalSupplyMethodId = "0x18160ddd"
 
