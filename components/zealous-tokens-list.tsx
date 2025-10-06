@@ -8,7 +8,8 @@ import { ChevronLeft, ChevronRight, ArrowUpDown, ArrowUp, ArrowDown } from "luci
 import { ZealousAPI, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
-import { useNetwork } from "@/context/NetworkContext"
+import { isBridgedToken, getTickerFromAddress } from "@/lib/bridged-tokens-config"
+import { krc20API } from "@/lib/krc20-api"
 
 interface ZealousTokensListProps {
   limit?: number
@@ -16,8 +17,6 @@ interface ZealousTokensListProps {
 }
 
 export default function ZealousTokensList({ limit = 10, showPagination = true }: ZealousTokensListProps) {
-  const { currentNetwork } = useNetwork();
-
   const [tokens, setTokens] = useState<Token[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +27,7 @@ export default function ZealousTokensList({ limit = 10, showPagination = true }:
 
   const router = useRouter()
   const zealousAPI = new ZealousAPI()
-  const kasplexAPI = new KasplexAPI(currentNetwork)
+  const kasplexAPI = new KasplexAPI("kasplex")
   const tokensPerPage = limit
 
   const formatCurrency = (value: number | undefined | null) => {
@@ -62,9 +61,22 @@ export default function ZealousTokensList({ limit = 10, showPagination = true }:
   }
 
   // Fetch token supply from RPC
-  const fetchTokenSupply = async (address: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string, symbol: string): Promise<number> => {
     try {
-      // ERC20 totalSupply() method signature
+      // Check if this is a bridged token
+      if (isBridgedToken(address) || isBridgedToken(symbol)) {
+        const ticker = symbol || getTickerFromAddress(address)
+        if (ticker) {
+          console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
+          const krc20Supply = await krc20API.getMaxSupply(ticker)
+          if (krc20Supply !== null) {
+            return krc20Supply
+          }
+          console.warn(`[v0] Failed to get KRC20 supply for ${ticker}, falling back to RPC`)
+        }
+      }
+
+      // Fall back to RPC for non-bridged tokens
       const totalSupplyMethodId = "0x18160ddd"
 
       const result = await kasplexAPI.rpcCall("eth_call", [
@@ -76,16 +88,13 @@ export default function ZealousTokensList({ limit = 10, showPagination = true }:
       ])
 
       if (result && result !== "0x") {
-        // Convert hex to decimal and adjust for decimals (assuming 18 decimals)
         const supply = Number.parseInt(result, 16) / Math.pow(10, 18)
         return supply
       }
 
-      // Fallback to mock supply if RPC call fails
       return Math.random() * 1000000000
     } catch (error) {
       console.warn(`Failed to fetch token supply for ${address}:`, error)
-      // Return mock supply as fallback
       return Math.random() * 1000000000
     }
   }
@@ -172,7 +181,7 @@ export default function ZealousTokensList({ limit = 10, showPagination = true }:
         const supplies: Record<string, number> = {}
         await Promise.all(
           tokensData.map(async (token) => {
-            const supply = await fetchTokenSupply(token.address)
+            const supply = await fetchTokenSupply(token.address, token.symbol)
             supplies[token.address] = supply
           }),
         )

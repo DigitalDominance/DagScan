@@ -9,6 +9,8 @@ import { ZealousAPI, type Token } from "@/lib/zealous-api"
 import { LFGAPI, type LFGToken } from "@/lib/lfg-api"
 import { KasplexAPI } from "@/lib/api"
 import { useRouter } from "next/navigation"
+import { isBridgedToken, getTickerFromAddress } from "@/lib/bridged-tokens-config"
+import { krc20API } from "@/lib/krc20-api"
 
 interface VerifiedTokensListProps {
   limit?: number
@@ -76,8 +78,22 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
     return `https://testnet.zealousswap.com/images/${logoURI}`
   }
 
-  const fetchTokenSupply = async (address: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string, symbol: string): Promise<number> => {
     try {
+      // Check if this is a bridged token
+      if (isBridgedToken(address) || isBridgedToken(symbol)) {
+        const ticker = symbol || getTickerFromAddress(address)
+        if (ticker) {
+          console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
+          const krc20Supply = await krc20API.getMaxSupply(ticker)
+          if (krc20Supply !== null) {
+            return krc20Supply
+          }
+          console.warn(`[v0] Failed to get KRC20 supply for ${ticker}, falling back to RPC`)
+        }
+      }
+
+      // Fall back to RPC for non-bridged tokens or if KRC20 fetch fails
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
 
       const totalSupplyMethodId = "0x18160ddd"
@@ -242,7 +258,7 @@ export default function VerifiedTokensList({ limit = 10, showPagination = true }
           const batchResults = await Promise.all(
             batch.map(async (token) => {
               try {
-                const totalSupply = await fetchTokenSupply(token.address)
+                const totalSupply = await fetchTokenSupply(token.address, token.symbol)
 
                 let currentPrice = token.priceUSD || 0
                 try {
