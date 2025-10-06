@@ -77,7 +77,7 @@ export default function TokensPage() {
     return `https://cdn-zealous-swap.fra1.cdn.digitaloceanspaces.com/kasplex/tokens/${logoURI}`
   }
 
-  const fetchTokenSupply = async (address: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string, symbol: string): Promise<number> => {
     try {
       const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error("Timeout")), 2000))
 
@@ -228,17 +228,25 @@ export default function TokensPage() {
 
         const verifiedTokens = allZealousTokens.filter((token) => token.verified)
 
-        const tokensToProcess = allZealousTokens.slice(0, 30)
+        const priorityTokens = ["WKAS", "KASPER"]
+        const sortedZealousTokens = allZealousTokens.sort((a, b) => {
+          const aPriority = priorityTokens.includes(a.symbol) ? 0 : 1
+          const bPriority = priorityTokens.includes(b.symbol) ? 0 : 1
+          if (aPriority !== bPriority) {
+            return aPriority - bPriority
+          }
+          return 0
+        })
 
         const batchSize = 3
         const tokensWithStats = []
 
-        for (let i = 0; i < tokensToProcess.length; i += batchSize) {
-          const batch = tokensToProcess.slice(i, i + batchSize)
+        for (let i = 0; i < sortedZealousTokens.length; i += batchSize) {
+          const batch = sortedZealousTokens.slice(i, i + batchSize)
           const batchResults = await Promise.all(
             batch.map(async (token) => {
               try {
-                const totalSupply = await fetchTokenSupply(token.address)
+                const totalSupply = await fetchTokenSupply(token.address, token.symbol)
 
                 let currentPrice = token.priceUSD || 0
                 try {
