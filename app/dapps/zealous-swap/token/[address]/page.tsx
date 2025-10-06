@@ -13,7 +13,6 @@ import {
   DollarSign,
   Activity,
   BarChart3,
-  Calendar,
   Copy,
   CheckCircle,
   ExternalLink,
@@ -23,11 +22,10 @@ import {
 import BeamsBackground from "@/components/beams-background"
 import Navigation from "@/components/navigation"
 import Footer from "@/components/footer"
-import TokenPriceChart from "@/components/token-price-chart"
 import { ZealousAPI, type Pool, type Token } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
-import { KRC20API } from "@/lib/krc20-api"
-import { isBridgedToken, getBridgedTokenTicker } from "@/lib/bridged-tokens-config"
+import { isBridgedToken, getTickerFromAddress } from "@/lib/bridged-tokens-config"
+import { krc20API } from "@/lib/krc20-api"
 
 interface TokenInfo extends Token {
   priceChange24h: number
@@ -58,7 +56,6 @@ export default function TokenPage() {
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
-  const krc20API = new KRC20API()
 
   const fetchAllTokens = async (): Promise<TokenApiInfo[]> => {
     try {
@@ -116,23 +113,23 @@ export default function TokenPage() {
   }
 
   // Fetch token supply from RPC
-  const fetchTokenSupply = async (address: string): Promise<number> => {
-    if (isBridgedToken(address)) {
-      try {
-        const ticker = getBridgedTokenTicker(address)
+  const fetchTokenSupply = async (address: string, symbol: string): Promise<number> => {
+    try {
+      // Check if this is a bridged token
+      if (isBridgedToken(address) || isBridgedToken(symbol)) {
+        const ticker = symbol || getTickerFromAddress(address)
         if (ticker) {
+          console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
           const krc20Supply = await krc20API.getMaxSupply(ticker)
-          if (krc20Supply > 0) {
-            console.log(`[v0] Using KRC20 supply for ${ticker}: ${krc20Supply}`)
+          if (krc20Supply !== null) {
+            console.log(`[v0] Got KRC20 supply for ${ticker}: ${krc20Supply}`)
             return krc20Supply
           }
+          console.warn(`[v0] Failed to get KRC20 supply for ${ticker}, falling back to RPC`)
         }
-      } catch (krc20Error) {
-        console.warn(`Failed to fetch KRC20 supply for ${address}, falling back to RPC:`, krc20Error)
       }
-    }
 
-    try {
+      // Fall back to RPC for non-bridged tokens or if KRC20 fetch fails
       // ERC20 totalSupply() method signature
       const totalSupplyMethodId = "0x18160ddd"
 
@@ -230,7 +227,7 @@ export default function TokenPage() {
         }
 
         // Fetch token supply from RPC
-        const totalSupply = await fetchTokenSupply(tokenAddress)
+        const totalSupply = await fetchTokenSupply(tokenAddress, token.symbol)
 
         // Get current price
         let currentPrice = token.priceUSD || 0
@@ -504,40 +501,9 @@ export default function TokenPage() {
             </Card>
 
             <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 sm:pb-2">
-                <CardTitle className="text-xs sm:text-sm font-medium text-white/70 font-rajdhani">
-                  Active Pools
-                </CardTitle>
-                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-purple-400" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-sm sm:text-lg lg:text-2xl font-bold text-white font-orbitron">
-                  {tokenInfo.pools.length}
-                </div>
-                <p className="text-xs text-purple-300 mt-1 font-inter">Liquidity pools</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          {/* Price Chart */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="mb-8 w-full max-w-full overflow-hidden"
-            data-chart
-          >
-            <TokenPriceChart tokenAddress={tokenAddress} tokenSymbol={tokenInfo.symbol} />
-          </motion.div>
-
-          {/* Token Pools */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <Card className="bg-black/40 border-white/20 backdrop-blur-xl">
               <CardHeader>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <CardTitle className="text-white font-orbitron text-center sm:text-left">
-                    Pools Containing {tokenInfo.symbol}
-                  </CardTitle>
+                  <CardTitle className="text-white font-orbitron text-center sm:text-left">Active Pools</CardTitle>
                   {totalPoolsPages > 1 && (
                     <div className="flex items-center justify-center sm:justify-end gap-2">
                       <Button
