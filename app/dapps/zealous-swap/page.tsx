@@ -15,6 +15,8 @@ import ZealousPoolsTable from "@/components/zealous-pools-table"
 import ZealousTokensList from "@/components/zealous-tokens-list"
 import { ZealousAPI, type ProtocolStats } from "@/lib/zealous-api"
 import { useRouter } from "next/navigation"
+import { KasplexAPI } from "@/lib/kasplex-api"
+import { isBridgedToken, getTickerFromAddress } from "@/lib/token-utils"
 
 export default function ZealousSwapPage() {
   const [protocolStats, setProtocolStats] = useState<ProtocolStats | null>(null)
@@ -38,8 +40,72 @@ export default function ZealousSwapPage() {
           // This is a simple way to get count - in real implementation you'd want a dedicated endpoint
           const allTokens = await zealousAPI.getTokens(1000, 0) // Get a large number to count
           setTokenCount(allTokens.length)
+
+          // Calculate accurate total market cap
+          let totalMarketCap = 0
+          const batchSize = 5
+
+          for (let i = 0; i < Math.min(allTokens.length, 50); i += batchSize) {
+            const batch = allTokens.slice(i, i + batchSize)
+            const batchMarketCaps = await Promise.all(
+              batch.map(async (token) => {
+                try {
+                  // Fetch supply with KRC20 resolution
+                  const kasplexAPI = new KasplexAPI("kasplex")
+                  let supply = 0
+
+                  // Check if this is a bridged token
+                  if (isBridgedToken(token.address) || isBridgedToken(token.symbol)) {
+                    const ticker = token.symbol || getTickerFromAddress(token.address)
+                    if (ticker) {
+                      const krc20Supply = await kasplexAPI.getMaxSupply(ticker)
+                      if (krc20Supply !== null) {
+                        supply = krc20Supply
+                      }
+                    }
+                  }
+
+                  // Fall back to RPC if not bridged or KRC20 fetch failed
+                  if (supply === 0) {
+                    try {
+                      const totalSupplyMethodId = "0x18160ddd"
+                      const result = await kasplexAPI.rpcCall("eth_call", [
+                        { to: token.address, data: totalSupplyMethodId },
+                        "latest",
+                      ])
+                      if (result && result !== "0x") {
+                        supply = Number.parseInt(result, 16) / Math.pow(10, 18)
+                      }
+                    } catch (rpcError) {
+                      console.warn(`Failed to fetch supply for ${token.symbol}:`, rpcError)
+                    }
+                  }
+
+                  // Get current price
+                  let currentPrice = token.priceUSD || 0
+                  try {
+                    const currentPriceData = await zealousAPI.getCurrentTokenPrice(token.address)
+                    if (currentPriceData && typeof currentPriceData.priceUSD === "number") {
+                      currentPrice = currentPriceData.priceUSD
+                    }
+                  } catch (priceError) {
+                    console.warn(`Could not fetch current price for ${token.symbol}:`, priceError)
+                  }
+
+                  return currentPrice * supply
+                } catch (error) {
+                  console.warn(`Error calculating market cap for ${token.symbol}:`, error)
+                  return 0
+                }
+              }),
+            )
+            totalMarketCap += batchMarketCaps.reduce((sum, mc) => sum + mc, 0)
+          }
+
+          // Update protocol stats with corrected market cap
+          setProtocolStats((prev) => (prev ? { ...prev, totalMarketCap } : null))
         } catch (tokenError) {
-          console.warn("Could not fetch token count:", tokenError)
+          console.warn("Could not calculate accurate market cap:", tokenError)
           setTokenCount(0)
         }
       } catch (err) {
