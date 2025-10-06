@@ -9,7 +9,8 @@ import { TrendingUp, TrendingDown, BarChart3, X, Maximize2, Minimize2, ZoomIn, Z
 import { ZealousAPI } from "@/lib/zealous-api"
 import { KasplexAPI } from "@/lib/api"
 import { LFGAPI } from "@/lib/lfg-api"
-import { KRC20API } from "@/lib/krc20-api" // Added import for KRC20API
+import { isBridgedToken, getTickerFromAddress } from "@/lib/bridged-tokens-config"
+import { krc20API } from "@/lib/krc20-api" // Added import for KRC20API and bridged token utilities
 
 interface TokenPriceChartProps {
   tokenAddress: string
@@ -32,16 +33,6 @@ interface TooltipData {
   marketCap: number
   timestamp: string
   visible: boolean
-}
-
-const isBridgedToken = (input: string) => {
-  // Placeholder function to check if a token is bridged
-  return input.toLowerCase().includes("bridged")
-}
-
-const getTickerFromAddress = (address: string) => {
-  // Placeholder function to get ticker from address
-  return address.slice(0, 6).toUpperCase()
 }
 
 export default function TokenPriceChart({ tokenAddress, tokenSymbol, apiType = "zealous" }: TokenPriceChartProps) {
@@ -83,7 +74,7 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol, apiType = "
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
   const lfgAPI = new LFGAPI()
-  const krc20API = new KRC20API() // Added KRC20API instance
+  const krc20APIInstance = krc20API // Added KRC20API instance
 
   const formatTimeLabel = (dateString: string, isShortRange: boolean) => {
     const date = new Date(dateString)
@@ -164,16 +155,15 @@ export default function TokenPriceChart({ tokenAddress, tokenSymbol, apiType = "
         const ticker = tokenSymbol || getTickerFromAddress(address)
         if (ticker) {
           console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
-          const krc20Supply = await krc20API.getMaxSupply(ticker)
+          const krc20Supply = await krc20APIInstance.getMaxSupply(ticker)
           if (krc20Supply !== null) {
-            console.log(`[v0] Using KRC20 supply ${krc20Supply} for ${ticker}`)
+            console.log(`[v0] Using KRC20 supply for ${ticker}: ${krc20Supply.toLocaleString()}`)
             return krc20Supply
           }
           console.warn(`[v0] Failed to get KRC20 supply for ${ticker}, falling back to RPC`)
         }
       }
 
-      // Fall back to RPC for non-bridged tokens
       const totalSupplyMethodId = "0x18160ddd"
 
       const result = await kasplexAPI.rpcCall("eth_call", [
