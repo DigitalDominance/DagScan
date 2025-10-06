@@ -58,6 +58,7 @@ export default function TokenPage() {
   const tokenAddress = params.address as string
   const zealousAPI = new ZealousAPI()
   const kasplexAPI = new KasplexAPI("kasplex")
+  const krc20API = new KRC20API()
 
   const fetchAllTokens = async (): Promise<TokenApiInfo[]> => {
     try {
@@ -116,22 +117,22 @@ export default function TokenPage() {
 
   // Fetch token supply from RPC
   const fetchTokenSupply = async (address: string): Promise<number> => {
-    try {
-      if (isBridgedToken(address)) {
+    if (isBridgedToken(address)) {
+      try {
         const ticker = getBridgedTokenTicker(address)
         if (ticker) {
-          try {
-            const krc20API = new KRC20API()
-            const krc20Supply = await krc20API.getMaxSupply(ticker)
-            if (krc20Supply > 0) {
-              return krc20Supply
-            }
-          } catch (krc20Error) {
-            console.warn(`Failed to fetch KRC20 supply for ${ticker}, falling back to RPC:`, krc20Error)
+          const krc20Supply = await krc20API.getMaxSupply(ticker)
+          if (krc20Supply > 0) {
+            console.log(`[v0] Using KRC20 supply for ${ticker}: ${krc20Supply}`)
+            return krc20Supply
           }
         }
+      } catch (krc20Error) {
+        console.warn(`Failed to fetch KRC20 supply for ${address}, falling back to RPC:`, krc20Error)
       }
+    }
 
+    try {
       // ERC20 totalSupply() method signature
       const totalSupplyMethodId = "0x18160ddd"
 
