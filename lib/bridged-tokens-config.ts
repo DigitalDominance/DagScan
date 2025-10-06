@@ -11,6 +11,7 @@ export interface BridgedTokenConfig {
 export const BRIDGED_TOKENS: BridgedTokenConfig[] = [
   { ticker: "NACHO", address: "0x..." }, // Replace with actual addresses
   { ticker: "ZEAL", address: "0x..." },
+  { ticker: "BITE", address: "0x..." },
   { ticker: "KASPY", address: "0x..." },
   { ticker: "WOLFY", address: "0x..." },
   { ticker: "KROAK", address: "0x..." },
