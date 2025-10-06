@@ -112,12 +112,11 @@ export default function TokenPage() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`
   }
 
-  // Fetch token supply from RPC
-  const fetchTokenSupply = async (address: string, symbol: string): Promise<number> => {
+  const fetchTokenSupply = async (address: string): Promise<number> => {
     try {
       // Check if this is a bridged token
-      if (isBridgedToken(address) || isBridgedToken(symbol)) {
-        const ticker = symbol || getTickerFromAddress(address)
+      if (isBridgedToken(address)) {
+        const ticker = getTickerFromAddress(address)
         if (ticker) {
           console.log(`[v0] Fetching KRC20 supply for bridged token ${ticker}`)
           const krc20Supply = await krc20API.getMaxSupply(ticker)
@@ -227,7 +226,7 @@ export default function TokenPage() {
         }
 
         // Fetch token supply from RPC
-        const totalSupply = await fetchTokenSupply(tokenAddress, token.symbol)
+        const totalSupply = await fetchTokenSupply(tokenAddress)
 
         // Get current price
         let currentPrice = token.priceUSD || 0
