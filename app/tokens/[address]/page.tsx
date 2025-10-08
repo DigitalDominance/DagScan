@@ -361,7 +361,7 @@ export default function TokenPage() {
   }
 
   const getZealousSwapUrl = (tokenAddress: string) => {
-    return `https://testnet.zealousswap.com/swap?from=KAS&to=${tokenAddress}`
+    return `https://zealousswap.com/swap?from=KAS&to=${tokenAddress}`
   }
 
   const getLFGTradeUrl = (tokenAddress: string) => {
